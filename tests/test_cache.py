@@ -201,9 +201,8 @@ class TestFileSystemCache:
         # Load and verify
         loaded = cache.load(key)
         assert loaded is not None
-        # Only compare the first row since we're storing by day
-        expected_row = sample_dataframe.iloc[[0]]  # First row only
-        pd.testing.assert_frame_equal(loaded, expected_row)
+        # The cache stores the entire DataFrame as-is
+        pd.testing.assert_frame_equal(loaded, sample_dataframe, check_freq=False)
     
     def test_store_empty_dataframe(self, cache):
         """Test storing an empty DataFrame (should be skipped)."""

@@ -15,20 +15,20 @@ graph TB
     YF --> Store[Store in Cache]
     Store --> Return[Return Data]
     LoadCache --> Return
-    
+
     subgraph "Cache Layer"
         Cache
         LoadCache
         Store
         FS[FileSystem Cache<br/>~/.cache/yfinance/]
     end
-    
+
     subgraph "Data Sources"
         YF
         Yahoo[Yahoo Finance API]
         YF --> Yahoo
     end
-    
+
     subgraph "Cache Structure"
         FS --> Symbol[SYMBOL/]
         Symbol --> Interval[interval/]
@@ -42,9 +42,9 @@ graph TB
         ExpDate --> Puts[puts.parquet]
         ExpDate --> OptMeta[metadata.json]
     end
-    
+
     Return --> App
-    
+
     style CYF fill:#e1f5fe
     style Cache fill:#f3e5f5
     style FS fill:#e8f5e8
@@ -249,7 +249,7 @@ symbol/options/YYYY-MM-DD/metadata.json
 1. **Request**: Application calls `cyf.get_option_chain("AAPL")`
 2. **Expiration Check**: Get available expiration dates (cached if available)
 3. **Cache Lookup**: Check for cached option chain data
-4. **Data Retrieval**: 
+4. **Data Retrieval**:
    - Cache hit: Load calls.parquet, puts.parquet, metadata.json
    - Cache miss: Fetch from yfinance, store in cache
 5. **Return**: Provide OptionChain namedtuple with calls, puts, underlying data
@@ -265,7 +265,7 @@ symbol/options/YYYY-MM-DD/metadata.json
 ### Caching Strategy
 
 - **Day-based Caching**: Each trading day cached separately
-- **Interval Separation**: Different intervals stored independently  
+- **Interval Separation**: Different intervals stored independently
 - **Option Expiration Grouping**: Options grouped by expiration date
 - **Lazy Loading**: Data loaded only when accessed
 

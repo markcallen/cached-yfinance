@@ -267,9 +267,8 @@ See the [`examples/`](examples/) directory for comprehensive usage examples:
 
 The [`tools/`](tools/) directory contains utility scripts for data management:
 
-- **[download_1m_data.py](tools/download_1m_data.py)**: Download 1-minute data for any ticker (60 days default)
+- **[download_data.py](tools/download_data.py)**: Download historical data for any ticker with configurable intervals
 - **[iwm_example.py](tools/iwm_example.py)**: Comprehensive IWM analysis example with market insights
-- **[update_cache.sh](tools/update_cache.sh)**: Automated cache update script for cron jobs
 - **[README.md](tools/README.md)**: Complete documentation for tools and cron job setup
 
 ## 🤝 Contributing
@@ -287,7 +286,14 @@ uv pip install -e .[dev]
 ### Running Tests
 
 ```bash
-pytest
+# Run all tests with coverage
+uv run pytest tests/ --cov=cached_yfinance --cov-report=term-missing --cov-report=html
+
+# Run specific test file
+uv run pytest tests/test_cache.py -v
+
+# Run specific test
+uv run pytest tests/test_cache.py::TestCacheKey::test_cache_key_creation -v
 ```
 
 ### Code Formatting
