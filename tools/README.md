@@ -4,32 +4,45 @@ This directory contains utility tools for downloading and managing financial dat
 
 ## 🛠️ Available Tools
 
-### 1. `download_1m_data.py` - 1-Minute Data Downloader
+### 1. `download_data.py` - Historical Data Downloader
 
-Downloads 1-minute historical data for any ticker symbol going back a specified number of days (default: 60 days).
+Downloads historical data for any ticker symbol with configurable intervals and time periods.
 
 **Usage:**
 
 ```bash
-python download_1m_data.py TICKER [--days DAYS] [--cache-dir CACHE_DIR]
+python download_data.py TICKER [--interval INTERVAL] [--days DAYS] [--cache-dir CACHE_DIR]
 ```
 
 **Examples:**
 
 ```bash
-# Download 60 days of IWM data (default)
-python download_1m_data.py IWM
+# Download 60 days of daily IWM data (default)
+python download_data.py IWM
 
-# Download 30 days of AAPL data
-python download_1m_data.py AAPL --days 30
+# Download 30 days of 1-minute AAPL data
+python download_data.py AAPL --interval 1m --days 30
+
+# Download 90 days of hourly TSLA data
+python download_data.py TSLA --interval 1h --days 90
+
+# Download 365 days of daily MSFT data
+python download_data.py MSFT --interval 1d --days 365
 
 # Use custom cache directory
-python download_1m_data.py TSLA --cache-dir ~/my_finance_cache
+python download_data.py GOOGL --cache-dir ~/my_finance_cache
 ```
+
+**Supported Intervals:**
+
+- **Intraday:** 1m, 5m, 15m, 30m, 1h (max 60 days, Yahoo Finance limits to ~30 days)
+- **Daily and longer:** 1d, 5d, 1wk, 1mo, 3mo (no practical limit)
 
 **Features:**
 
-- ✅ Downloads and caches 1-minute data efficiently
+- ✅ Downloads and caches data at multiple intervals efficiently
+- ✅ Validates interval and days parameters
+- ✅ Enforces 60-day limit for intraday intervals
 - ✅ Displays summary statistics and recent data
 - ✅ Shows cache location and file count
 - ✅ Handles errors gracefully
@@ -62,12 +75,6 @@ python download_options_data.py IWM --list-expirations
 
 # Use custom cache directory
 python download_options_data.py AAPL --cache-dir ~/my_options_cache
-
-# All downloads automatically include timestamps for historical tracking
-python download_options_data.py AAPL
-
-# Download all expirations (all with automatic timestamps)
-python download_options_data.py SPY --all-expirations
 ```
 
 **Features:**
@@ -131,39 +138,46 @@ python market_hours_collector.py --dry-run
 - ✅ **Dry run mode** for testing configurations
 - ✅ **Multiple timezone support** for different markets
 
-### 4. `setup_cron.sh` - Easy Cron Job Setup
+## 🔄 Setting Up Automated Market Hours Collection with Cron
 
-**NEW!** Interactive script to help set up automated options data collection via cron.
+To automatically collect options data during market hours using `market_hours_collector.py`, you can set up a cron job that runs every 15 minutes during market hours (9:30 AM - 4:00 PM EST, weekdays).
 
-**Usage:**
+### Cron Setup for Market Hours Collector
 
-```bash
-./setup_cron.sh
-```
+1. **Open your crontab for editing:**
 
-**Features:**
+   ```bash
+   crontab -e
+   ```
 
-- ✅ **Interactive setup** with validation
-- ✅ **Automatic cron job generation** (every 15 minutes during market hours)
-- ✅ **Configuration testing** before installation
-- ✅ **Backup existing crontab** for safety
-- ✅ **Helpful monitoring commands** and next steps
+2. **Add the following cron job entry:**
 
-## 🔄 Automated Data Updates with Cron
+   ```bash
+   # Collect options data every 15 minutes during market hours (9:30 AM - 4:00 PM EST, weekdays)
+   */15 9-16 * * 1-5 cd /Users/mark/src/everydaydevops/cached-yfinance && python tools/market_hours_collector.py --config tools/market_collector_config.json >> /tmp/market_collector.log 2>&1
+   ```
 
-To keep your cache up-to-date with fresh data, you can set up automated downloads using cron jobs.
+   **Note:** Replace `/Users/mark/src/everydaydevops/cached-yfinance` with your actual project path.
 
-### Quick Setup (Recommended)
+3. **Save and exit** the crontab editor.
 
-**Use the automated setup script for options data collection:**
+### Configuration
 
-```bash
-./setup_cron.sh
-```
+The `market_hours_collector.py` uses the `market_collector_config.json` file for configuration. You can customize the tickers, cache directory, and other settings by editing this file.
 
-This will set up the `market_hours_collector.py` to run every 15 minutes during market hours, automatically building historical options datasets.
+### Monitoring
 
-### Manual Cron Setup
+- **View logs:** `tail -f /tmp/market_collector.log`
+- **Test manually:** `python tools/market_hours_collector.py --dry-run`
+- **List cron jobs:** `crontab -l`
+
+## 🔄 Additional Automated Data Updates with Cron
+
+For other data collection needs, you can set up additional cron jobs using the other tools.
+
+### Manual Cron Setup for Other Tools
+
+For setting up cron jobs for the other data collection tools, follow these steps:
 
 1. **Open your crontab for editing:**
 
@@ -173,7 +187,7 @@ This will set up the `market_hours_collector.py` to run every 15 minutes during 
 
 2. **Add cron job entries** (choose the schedule that fits your needs):
 
-#### Intraday Options Collection (NEW - Recommended for Historical Data)
+#### Intraday Options Collection (Recommended for Historical Data)
 
 Collect options data every 15 minutes during market hours to build comprehensive historical datasets:
 
@@ -182,17 +196,19 @@ Collect options data every 15 minutes during market hours to build comprehensive
 */15 9-16 * * 1-5 cd path_to_directory/cached-yfinance && python tools/market_hours_collector.py --config tools/market_collector_config.json >> /tmp/market_collector.log 2>&1
 ```
 
+**Note:** Replace `path_to_directory` with your actual project path.
+
 #### Daily Updates (Traditional)
 
 Download fresh data every weekday at 6 PM ET (after market close):
 
 ```bash
 # Download IWM data daily at 6 PM ET (weekdays only)
-0 18 * * 1-5 cd path_to_directory/cached-yfinance && python tools/download_1m_data.py IWM --days 5 >> /tmp/iwm_download.log 2>&1
+0 18 * * 1-5 cd path_to_directory/cached-yfinance && python tools/download_data.py IWM --interval 1m --days 5 >> /tmp/iwm_download.log 2>&1
 
 # Download multiple tickers daily
-0 18 * * 1-5 cd path_to_directory/cached-yfinance && python tools/download_1m_data.py AAPL --days 5 >> /tmp/aapl_download.log 2>&1
-0 19 * * 1-5 cd path_to_directory/cached-yfinance && python tools/download_1m_data.py TSLA --days 5 >> /tmp/tsla_download.log 2>&1
+0 18 * * 1-5 cd path_to_directory/cached-yfinance && python tools/download_data.py AAPL --interval 1m --days 5 >> /tmp/aapl_download.log 2>&1
+0 19 * * 1-5 cd path_to_directory/cached-yfinance && python tools/download_data.py TSLA --interval 1m --days 5 >> /tmp/tsla_download.log 2>&1
 
 # Download options data daily (after market close) - timestamps are automatic
 0 18 * * 1-5 cd path_to_directory/cached-yfinance && python tools/download_options_data.py AAPL >> /tmp/aapl_options.log 2>&1
@@ -205,7 +221,7 @@ Download a full week of data every Sunday at 8 PM:
 
 ```bash
 # Weekly full refresh on Sundays
-0 20 * * 0 cd path_to_directory/cached-yfinance && python tools/download_1m_data.py IWM --days 7 >> /tmp/iwm_weekly.log 2>&1
+0 20 * * 0 cd path_to_directory/cached-yfinance && python tools/download_data.py IWM --interval 1m --days 7 >> /tmp/iwm_weekly.log 2>&1
 ```
 
 #### Hourly Updates (During Market Hours)
@@ -214,7 +230,7 @@ For real-time trading applications, update every hour during market hours:
 
 ```bash
 # Update every hour during market hours (9:30 AM - 4 PM ET, weekdays)
-30 9-16 * * 1-5 cd path_to_directory/cached-yfinance && python tools/download_1m_data.py IWM --days 1 >> /tmp/iwm_hourly.log 2>&1
+30 9-16 * * 1-5 cd path_to_directory/cached-yfinance && python tools/download_data.py IWM --interval 1m --days 1 >> /tmp/iwm_hourly.log 2>&1
 ```
 
 ### 📝 Cron Schedule Format
@@ -231,64 +247,6 @@ For real-time trading applications, update every hour during market hours:
 
 ### 🔧 Advanced Cron Setup
 
-#### Using a Wrapper Script
-
-Create a wrapper script for more complex logic:
-
-```bash
-# Create wrapper script
-cat > path_to_directory/cached-yfinance/tools/update_cache.sh << 'EOF'
-#!/bin/bash
-
-# Set up environment
-export PATH="/usr/local/bin:/usr/bin:/bin"
-
-# Get the directory where this script is located and go to parent directory
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
-cd "$PROJECT_DIR"
-
-# List of tickers to update
-TICKERS=("IWM" "AAPL" "TSLA" "SPY" "QQQ")
-
-# Log file with timestamp
-LOG_FILE="/tmp/cache_update_$(date +%Y%m%d).log"
-
-echo "$(date): Starting cache update" >> "$LOG_FILE"
-
-# Update each ticker (1-minute data)
-for ticker in "${TICKERS[@]}"; do
-    echo "$(date): Updating 1m data for $ticker" >> "$LOG_FILE"
-    python tools/download_1m_data.py "$ticker" --days 5 >> "$LOG_FILE" 2>&1
-
-    # Add delay between requests to be respectful to the API
-    sleep 10
-done
-
-# Update options data for key tickers
-OPTIONS_TICKERS=("AAPL" "TSLA" "SPY")
-for ticker in "${OPTIONS_TICKERS[@]}"; do
-    echo "$(date): Updating options data for $ticker" >> "$LOG_FILE"
-    python tools/download_options_data.py "$ticker" >> "$LOG_FILE" 2>&1
-
-    # Add delay between requests to be respectful to the API
-    sleep 15
-done
-
-echo "$(date): Cache update complete" >> "$LOG_FILE"
-EOF
-
-# Make it executable
-chmod +x path_to_directory/cached-yfinance/tools/update_cache.sh
-```
-
-Then add to crontab:
-
-```bash
-# Run wrapper script daily at 6 PM
-0 18 * * 1-5 path_to_directory/cached-yfinance/tools/update_cache.sh
-```
-
 #### Environment Variables for Cron
 
 If you need custom cache directories or other settings:
@@ -296,7 +254,7 @@ If you need custom cache directories or other settings:
 ```bash
 # Set environment variables in crontab
 CACHED_YFINANCE_CACHE_DIR=/custom/cache/path
-0 18 * * 1-5 cd path_to_directory/cached-yfinance && python tools/download_1m_data.py IWM --days 5
+0 18 * * 1-5 cd path_to_directory/cached-yfinance && python tools/download_data.py IWM --interval 1m --days 5
 ```
 
 ### 📊 Monitoring Cron Jobs
@@ -315,7 +273,7 @@ CACHED_YFINANCE_CACHE_DIR=/custom/cache/path
 
    ```bash
    # Run the exact command from your crontab
-   cd path_to_directory/cached-yfinance && python tools/download_1m_data.py IWM --days 5
+   cd path_to_directory/cached-yfinance && python tools/download_data.py IWM --interval 1m --days 5
    ```
 
 3. **List active cron jobs:**
@@ -342,7 +300,7 @@ For most users, we recommend:
 
 ```bash
 # Add these to your crontab
-0 18 * * 1-5 cd path_to_directory/cached-yfinance && python tools/download_1m_data.py IWM --days 5 >> /tmp/iwm_$(date +\%Y\%m\%d).log 2>&1
+0 18 * * 1-5 cd path_to_directory/cached-yfinance && python tools/download_data.py IWM --interval 1m --days 5 >> /tmp/iwm_$(date +\%Y\%m\%d).log 2>&1
 
 # Clean up old logs weekly (keep last 30 days)
 0 2 * * 0 find /tmp -name "iwm_*.log" -mtime +30 -delete
