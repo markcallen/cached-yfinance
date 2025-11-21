@@ -14,36 +14,6 @@ A high-performance caching wrapper around [yfinance](https://github.com/ranarous
 - **Thread-safe operations**
 - **Automatic cache invalidation** for stale data
 
-## 📦 Installation
-
-### From PyPI (recommended)
-
-```bash
-pip install cached-yfinance
-```
-
-### From Source
-
-```bash
-git clone https://github.com/yourusername/cached-yfinance.git
-cd cached-yfinance
-pip install -e .
-```
-
-### Optional Dependencies
-
-For enhanced market calendar support:
-
-```bash
-pip install cached-yfinance[market-calendars]
-```
-
-For development:
-
-```bash
-pip install cached-yfinance[dev]
-```
-
 ## 🏃‍♂️ Quick Start
 
 ### Basic Usage
@@ -95,6 +65,168 @@ client = CachedYFClient(cache)
 data = client.download("TSLA", start="2023-01-01", end="2023-12-31")
 ```
 
+## 📦 Installation
+
+### From PyPI (recommended)
+
+```bash
+pip install cached-yfinance
+```
+
+or
+
+```bash
+uv add cached-yfinance
+```
+
+### From Source
+
+```bash
+git clone https://github.com/markcallen/cached-yfinance.git
+cd cached-yfinance
+uv pip install -e .
+```
+
+### From Built Distribution
+
+If you have the distribution files:
+
+```bash
+# Install from wheel (recommended)
+pip install cached_yfinance-0.1.0-py3-none-any.whl
+
+# Or install from source distribution
+pip install cached_yfinance-0.1.0.tar.gz
+```
+
+### Building from Source
+
+#### Prerequisites
+
+- Python 3.8 or higher
+- pip (latest version recommended)
+
+#### Build Steps
+
+1. **Clone the repository:**
+
+   ```bash
+   git clone https://github.com/markcallen/cached-yfinance.git
+   cd cached-yfinance
+   ```
+
+2. **Install build dependencies:**
+
+   ```bash
+   pip install build
+   ```
+
+3. **Build the package:**
+
+   ```bash
+   python -m build
+   ```
+
+4. **Install the built package:**
+   ```bash
+   pip install dist/cached_yfinance-0.1.0-py3-none-any.whl
+   ```
+
+### Optional Dependencies
+
+#### Market Calendar Support
+
+For enhanced market calendar functionality:
+
+```bash
+pip install pandas-market-calendars
+# or
+uv add cached-yfinance[market-calendars]
+```
+
+#### Development Dependencies
+
+For contributing to the project:
+
+```bash
+pip install -e .[dev]
+# or
+uv add cached-yfinance[dev]
+```
+
+This installs:
+
+- pytest (testing)
+- pytest-cov (coverage)
+- black (code formatting)
+- mypy (type checking)
+- ruff (linting and import sorting)
+
+### Installation Verification
+
+After installation, verify everything works:
+
+```python
+import cached_yfinance as cyf
+print(f"Cached YFinance version: {cyf.__version__}")
+
+# Test basic functionality
+data = cyf.download("AAPL", period="5d")
+print(f"Downloaded {len(data)} rows of AAPL data")
+```
+
+### Troubleshooting
+
+#### Common Issues
+
+1. **Import Error: No module named 'cached_yfinance'**
+   - Ensure the package is installed: `pip list | grep cached-yfinance`
+   - Try reinstalling: `pip uninstall cached-yfinance && pip install cached-yfinance`
+
+2. **Permission Denied (Cache Directory)**
+   - The default cache location is `~/.cache/yfinance/`
+   - Ensure you have write permissions to your home directory
+   - Or use a custom cache location:
+     ```python
+     from cached_yfinance import CachedYFClient, FileSystemCache
+     cache = FileSystemCache("/path/to/writable/directory")
+     client = CachedYFClient(cache)
+     ```
+
+3. **Network Errors**
+   - Cached YFinance requires internet access for initial data fetching
+   - Subsequent calls use cached data and don't require network access
+   - Check your internet connection and firewall settings
+
+4. **Dependency Conflicts**
+   - Use a virtual environment to avoid conflicts:
+     ```bash
+     python -m venv venv
+     source venv/bin/activate  # On Windows: venv\Scripts\activate
+     pip install cached-yfinance
+     ```
+
+### Uninstallation
+
+To remove the package:
+
+```bash
+pip uninstall cached-yfinance
+```
+
+Note: This will not remove cached data. To clean up cache files:
+
+```python
+import shutil
+from pathlib import Path
+
+# Remove default cache directory
+cache_dir = Path.home() / ".cache" / "yfinance"
+if cache_dir.exists():
+    shutil.rmtree(cache_dir)
+    print(f"Removed cache directory: {cache_dir}")
+```
+
 ## 📊 Performance Benefits
 
 Cached YFinance can provide significant performance improvements:
@@ -108,170 +240,11 @@ Cached YFinance can provide significant performance improvements:
 
 _Performance may vary based on network conditions and data size._
 
-## 🛠️ API Reference
+## 📖 Documentation
 
-### Module-level Functions
+For detailed technical information, see:
 
-#### `download(tickers, start=None, end=None, period=None, interval="1d", **kwargs)`
-
-Drop-in replacement for `yfinance.download()` with caching.
-
-**Parameters:**
-
-- `tickers` (str or list): Ticker symbol(s) to download
-- `start` (str, datetime, optional): Start date for data
-- `end` (str, datetime, optional): End date for data
-- `period` (str, optional): Period to download (e.g., "1y", "6mo", "1d")
-- `interval` (str): Data interval (1m, 5m, 15m, 30m, 1h, 1d, 5d, 1wk, 1mo, 3mo)
-- `**kwargs`: Additional arguments passed to yfinance
-
-**Returns:**
-
-- `pandas.DataFrame`: Historical market data
-
-#### `get_options_expirations(ticker, use_cache=True)`
-
-Get available option expiration dates for a ticker.
-
-**Parameters:**
-
-- `ticker` (str): Stock symbol
-- `use_cache` (bool): Whether to use cached data if available
-
-**Returns:**
-
-- `tuple`: Tuple of expiration date strings (YYYY-MM-DD format)
-
-#### `get_option_chain(ticker, expiration=None, use_cache=True)`
-
-Get option chain data for a ticker and expiration date.
-
-**Parameters:**
-
-- `ticker` (str): Stock symbol
-- `expiration` (str, optional): Expiration date in YYYY-MM-DD format. If None, uses nearest expiration.
-- `use_cache` (bool): Whether to use cached data if available
-
-**Returns:**
-
-- `OptionChain`: NamedTuple with `calls`, `puts` DataFrames and `underlying` data dict
-
-### Classes
-
-#### `CachedYFClient`
-
-Main client class for cached yfinance operations.
-
-```python
-from cached_yfinance import CachedYFClient, FileSystemCache
-
-# Initialize with default cache
-client = CachedYFClient()
-
-# Initialize with custom cache
-cache = FileSystemCache("/path/to/cache")
-client = CachedYFClient(cache)
-
-# Download data
-data = client.download("AAPL", period="1y")
-```
-
-#### `FileSystemCache`
-
-File system-based cache implementation.
-
-```python
-from cached_yfinance import FileSystemCache
-
-# Default cache location (~/.cache/yfinance)
-cache = FileSystemCache()
-
-# Custom cache location
-cache = FileSystemCache("/custom/path")
-
-# Check if data is cached
-from cached_yfinance import CacheKey
-from datetime import date
-
-key = CacheKey(symbol="AAPL", interval="1d", day=date.today())
-if cache.has(key):
-    data = cache.load(key)
-```
-
-#### `CacheKey`
-
-Represents a cache key for a specific symbol, interval, and date.
-
-```python
-from cached_yfinance import CacheKey
-from datetime import date
-
-key = CacheKey(symbol="AAPL", interval="1d", day=date(2023, 12, 25))
-```
-
-#### `OptionCacheKey`
-
-Represents a cache key for option chain data.
-
-```python
-from cached_yfinance import OptionCacheKey
-
-# Create keys for different option data types
-calls_key = OptionCacheKey.for_calls("AAPL", "2024-01-19")
-puts_key = OptionCacheKey.for_puts("AAPL", "2024-01-19")
-underlying_key = OptionCacheKey.for_underlying("AAPL", "2024-01-19")
-```
-
-#### `OptionChain`
-
-NamedTuple containing option chain data.
-
-```python
-from cached_yfinance import get_option_chain
-
-option_chain = get_option_chain("AAPL")
-calls_df = option_chain.calls      # DataFrame with call options
-puts_df = option_chain.puts        # DataFrame with put options
-underlying_data = option_chain.underlying  # Dict with stock info
-```
-
-## 🗂️ Cache Structure
-
-The cache organizes data in a hierarchical structure:
-
-```
-~/.cache/yfinance/
-├── AAPL/
-│   ├── 1d/
-│   │   ├── 2023/
-│   │   │   ├── 12/
-│   │   │   │   ├── 2023-12-25-1d.parquet
-│   │   │   │   └── 2023-12-25-1d.json
-│   │   └── 01/
-│   ├── 1h/
-│   └── options/
-│       ├── 2024-01-19/
-│       │   ├── calls.parquet
-│       │   ├── puts.parquet
-│       │   └── metadata.json
-│       └── 2024-02-16/
-└── TSLA/
-    ├── 1d/
-    └── options/
-```
-
-Each cache entry consists of:
-
-**Price Data:**
-
-- **`.parquet` file**: Compressed pandas DataFrame with market data
-- **`.json` file**: Metadata including symbol, date, row count, and columns
-
-**Option Data:**
-
-- **`calls.parquet`**: DataFrame with call option contracts
-- **`puts.parquet`**: DataFrame with put option contracts
-- **`metadata.json`**: Metadata including underlying stock data, contract counts, and cache timestamp
+- **[ARCHITECTURE.md](ARCHITECTURE.md)** - Complete API reference, cache structure, and system architecture with diagrams
 
 ## 🔧 Configuration
 
@@ -279,30 +252,7 @@ Each cache entry consists of:
 
 - `CACHED_YFINANCE_CACHE_DIR`: Override default cache directory
 
-### Cache Management
-
-```python
-from cached_yfinance import FileSystemCache
-
-cache = FileSystemCache()
-
-# List cached days for a symbol
-cached_days = list(cache.iter_cached_days("AAPL", "1d"))
-print(f"Cached {len(cached_days)} days for AAPL")
-
-# List cached option expirations
-cached_expirations = list(cache.iter_cached_option_expirations("AAPL"))
-print(f"Cached {len(cached_expirations)} option expirations for AAPL")
-
-# Check cache size
-import os
-cache_size = sum(
-    os.path.getsize(os.path.join(dirpath, filename))
-    for dirpath, dirnames, filenames in os.walk(cache.root)
-    for filename in filenames
-)
-print(f"Cache size: {cache_size / 1024 / 1024:.2f} MB")
-```
+For detailed cache management examples, see [ARCHITECTURE.md](ARCHITECTURE.md#configuration).
 
 ## 📚 Examples
 
@@ -331,7 +281,7 @@ Contributions are welcome! Please feel free to submit a Pull Request. For major 
 ```bash
 git clone https://github.com/yourusername/cached-yfinance.git
 cd cached-yfinance
-pip install -e .[dev]
+uv pip install -e .[dev]
 ```
 
 ### Running Tests
@@ -344,7 +294,7 @@ pytest
 
 ```bash
 black cached_yfinance/
-isort cached_yfinance/
+ruff check --fix cached_yfinance/
 ```
 
 ## 📄 License
@@ -366,11 +316,8 @@ This software is for informational purposes only. It should not be considered fi
 - [x] **Option chain support with caching** ✅
 - [ ] Support for multiple tickers in a single download call
 - [ ] Redis/database cache backends
-- [ ] Automatic cache cleanup and rotation
-- [ ] Real-time data streaming support
 - [ ] Integration with popular financial analysis libraries
 - [ ] Option Greeks calculation and caching
-- [ ] Historical option data support
 
 ---
 
