@@ -28,55 +28,61 @@ import cached_yfinance as cyf
 from cached_yfinance import FileSystemCache
 
 
-def get_upcoming_expirations(ticker: str, client: cyf.CachedYFClient, days_ahead: int = 365) -> List[Tuple[str, int]]:
+def get_upcoming_expirations(
+    ticker: str, client: cyf.CachedYFClient, days_ahead: int = 365
+) -> List[Tuple[str, int]]:
     """
     Get upcoming expiration dates for options.
-    
+
     Args:
         ticker: Stock ticker symbol
         client: CachedYFClient instance
         days_ahead: Only include expirations within this many days (default: 365)
-        
+
     Returns:
         List of tuples (expiration_date, days_until_expiration)
     """
     print(f"📅 Getting upcoming expiration dates for {ticker.upper()}...")
-    
+
     try:
         # Get all available expiration dates (try cache first, then fresh if needed)
         all_expirations = client.get_options_expirations(ticker.upper(), use_cache=True)
-        
+
         # If no expirations found or all are expired, try fresh fetch
         if not all_expirations:
             print(f"   No cached expirations found, fetching fresh data...")
-            all_expirations = client.get_options_expirations(ticker.upper(), use_cache=False)
-        
+            all_expirations = client.get_options_expirations(
+                ticker.upper(), use_cache=False
+            )
+
         if not all_expirations:
             print(f"⚠️  No expiration dates found for {ticker.upper()}")
             return []
-        
+
         # Filter for upcoming expirations only
         upcoming = []
-        current_date = datetime.now().date()  # Use date() to compare dates only, not time
-        
+        current_date = (
+            datetime.now().date()
+        )  # Use date() to compare dates only, not time
+
         for exp_str in all_expirations:
             try:
-                exp_date = datetime.strptime(exp_str, '%Y-%m-%d').date()
+                exp_date = datetime.strptime(exp_str, "%Y-%m-%d").date()
                 days_until = (exp_date - current_date).days
-                
+
                 # Include current day (0) and future expirations within the specified range
                 if 0 <= days_until <= days_ahead:
                     upcoming.append((exp_str, days_until))
-                    
+
             except ValueError:
                 # Skip invalid date formats
                 continue
-        
+
         # Sort by days until expiration
         upcoming.sort(key=lambda x: x[1])
-        
+
         return upcoming
-        
+
     except Exception as e:
         print(f"❌ Error getting expiration dates for {ticker.upper()}: {e}")
         return []
@@ -87,12 +93,14 @@ def display_expirations(expirations: List[Tuple[str, int]], ticker: str) -> None
     if not expirations:
         print(f"⚠️  No upcoming expiration dates found for {ticker.upper()}")
         return
-    
-    print(f"\n📊 Found {len(expirations)} upcoming expiration dates for {ticker.upper()}:")
+
+    print(
+        f"\n📊 Found {len(expirations)} upcoming expiration dates for {ticker.upper()}:"
+    )
     print("-" * 60)
     print(f"{'#':<3} {'Expiration':<12} {'Days Until':<12} {'Status'}")
     print("-" * 60)
-    
+
     for i, (exp_date, days_until) in enumerate(expirations, 1):
         if days_until == 0:
             status = "Expires today!"
@@ -106,74 +114,86 @@ def display_expirations(expirations: List[Tuple[str, int]], ticker: str) -> None
             status = f"Next 3 months"
         else:
             status = f"Long term"
-            
+
         print(f"{i:<3} {exp_date:<12} {days_until:<12} {status}")
 
 
-def download_all_options_data(ticker: str, client: cyf.CachedYFClient, expirations: List[Tuple[str, int]]) -> dict:
+def download_all_options_data(
+    ticker: str, client: cyf.CachedYFClient, expirations: List[Tuple[str, int]]
+) -> dict:
     """
     Download options data for all expiration dates.
-    
+
     Args:
         ticker: Stock ticker symbol
         client: CachedYFClient instance
         expirations: List of (expiration_date, days_until) tuples
-        
+
     Returns:
         Dictionary with download statistics
     """
     if not expirations:
         print(f"⚠️  No expirations to download for {ticker.upper()}")
         return {"total": 0, "successful": 0, "failed": 0}
-    
-    print(f"\n🚀 Starting download of options data for {len(expirations)} expirations...")
+
+    print(
+        f"\n🚀 Starting download of options data for {len(expirations)} expirations..."
+    )
     print("=" * 70)
-    
+
     stats = {
         "total": len(expirations),
         "successful": 0,
         "failed": 0,
         "total_calls": 0,
-        "total_puts": 0
+        "total_puts": 0,
     }
-    
+
     for i, (expiration, days_until) in enumerate(expirations, 1):
-        print(f"\n📈 [{i}/{len(expirations)}] Processing {expiration} ({days_until} days until expiration)")
-        
+        print(
+            f"\n📈 [{i}/{len(expirations)}] Processing {expiration} ({days_until} days until expiration)"
+        )
+
         try:
             # Download option chain data
-            option_chain = client.get_option_chain(ticker.upper(), expiration, use_cache=False)
-            
+            option_chain = client.get_option_chain(
+                ticker.upper(), expiration, use_cache=False
+            )
+
             if option_chain.calls.empty and option_chain.puts.empty:
                 print(f"   ⚠️  No options data available for {expiration}")
                 stats["failed"] += 1
                 continue
-            
+
             # Count contracts
             calls_count = len(option_chain.calls)
             puts_count = len(option_chain.puts)
-            
+
             stats["successful"] += 1
             stats["total_calls"] += calls_count
             stats["total_puts"] += puts_count
-            
+
             # Get underlying price for context
-            underlying_price = option_chain.underlying.get('regularMarketPrice', 'N/A')
-            
+            underlying_price = option_chain.underlying.get("regularMarketPrice", "N/A")
+
             print(f"   ✅ Downloaded: {calls_count} calls, {puts_count} puts")
             print(f"   📊 Underlying price: ${underlying_price}")
-            
+
             # Show some sample strikes for context
             if not option_chain.calls.empty:
-                strikes = sorted(option_chain.calls['strike'].unique())
-                sample_strikes = strikes[:3] + ['...'] + strikes[-3:] if len(strikes) > 6 else strikes
+                strikes = sorted(option_chain.calls["strike"].unique())
+                sample_strikes = (
+                    strikes[:3] + ["..."] + strikes[-3:]
+                    if len(strikes) > 6
+                    else strikes
+                )
                 print(f"   🎯 Strike range: {sample_strikes}")
-            
+
         except Exception as e:
             print(f"   ❌ Error downloading {expiration}: {e}")
             stats["failed"] += 1
             continue
-    
+
     return stats
 
 
@@ -188,11 +208,11 @@ def print_summary(stats: dict, ticker: str) -> None:
     print(f"Total call contracts: {stats['total_calls']:,}")
     print(f"Total put contracts: {stats['total_puts']:,}")
     print(f"Total contracts: {stats['total_calls'] + stats['total_puts']:,}")
-    
-    if stats['total'] > 0:
-        success_rate = (stats['successful'] / stats['total']) * 100
+
+    if stats["total"] > 0:
+        success_rate = (stats["successful"] / stats["total"]) * 100
         print(f"Success rate: {success_rate:.1f}%")
-    
+
     print("\n💾 Data has been cached and is ready for analysis!")
     print("💡 Use the cached_yfinance library to access the downloaded data.")
 
@@ -208,42 +228,39 @@ Examples:
   %(prog)s TSLA --list-only        # Just list TSLA expirations  
   %(prog)s MSFT --cache-dir /tmp   # Use custom cache directory
   %(prog)s SPY --days-ahead 90     # Only expirations in next 90 days
-        """
+        """,
     )
-    
-    parser.add_argument(
-        "ticker",
-        help="Stock ticker symbol (e.g., AAPL, TSLA, SPY)"
-    )
-    
+
+    parser.add_argument("ticker", help="Stock ticker symbol (e.g., AAPL, TSLA, SPY)")
+
     parser.add_argument(
         "--list-only",
         action="store_true",
-        help="Only list expiration dates, don't download data"
+        help="Only list expiration dates, don't download data",
     )
-    
+
     parser.add_argument(
         "--cache-dir",
         type=str,
-        help="Custom cache directory path (default: ~/.cache/yfinance)"
+        help="Custom cache directory path (default: ~/.cache/yfinance)",
     )
-    
+
     parser.add_argument(
         "--days-ahead",
         type=int,
         default=365,
-        help="Only include expirations within this many days (default: 365)"
+        help="Only include expirations within this many days (default: 365)",
     )
-    
+
     args = parser.parse_args()
-    
+
     # Validate ticker
     if not args.ticker or not args.ticker.strip():
         print("❌ Error: Ticker symbol cannot be empty")
         sys.exit(1)
-    
+
     ticker = args.ticker.strip().upper()
-    
+
     # Initialize cache and client
     if args.cache_dir:
         cache = FileSystemCache(args.cache_dir)
@@ -252,21 +269,21 @@ Examples:
     else:
         client = cyf.CachedYFClient()
         print(f"📁 Using default cache directory: ~/.cache/yfinance")
-    
+
     print(f"🎯 Target ticker: {ticker}")
     print(f"📅 Looking ahead: {args.days_ahead} days")
-    
+
     # Get upcoming expiration dates
     expirations = get_upcoming_expirations(ticker, client, args.days_ahead)
-    
+
     # Display the expirations
     display_expirations(expirations, ticker)
-    
+
     # If list-only mode, stop here
     if args.list_only:
         print(f"\n✅ Listed {len(expirations)} upcoming expirations for {ticker}")
         return
-    
+
     # Download all options data
     if expirations:
         stats = download_all_options_data(ticker, client, expirations)

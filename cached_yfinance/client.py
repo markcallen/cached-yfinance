@@ -21,6 +21,7 @@ TickerInput = Union[str, List[str]]
 
 class OptionChain(NamedTuple):
     """Option chain data structure matching yfinance.ticker.Options"""
+
     calls: pd.DataFrame
     puts: pd.DataFrame
     underlying: dict
@@ -39,7 +40,9 @@ class DownloadRequest:
         return any(self.interval.endswith(suffix) for suffix in ("m", "h"))
 
 
-def _parse_timestamp(value: Optional[Union[str, datetime, pd.Timestamp]]) -> Optional[pd.Timestamp]:
+def _parse_timestamp(
+    value: Optional[Union[str, datetime, pd.Timestamp]],
+) -> Optional[pd.Timestamp]:
     if value is None:
         return None
     if isinstance(value, pd.Timestamp):
@@ -79,12 +82,21 @@ def _parse_period_to_timedelta(period: Optional[str]) -> Optional[pd.Timedelta]:
         return None
 
 
-def _normalize_range(start: Optional[pd.Timestamp], end: Optional[pd.Timestamp], period: Optional[str], interval: str) -> Tuple[Optional[pd.Timestamp], Optional[pd.Timestamp]]:
+def _normalize_range(
+    start: Optional[pd.Timestamp],
+    end: Optional[pd.Timestamp],
+    period: Optional[str],
+    interval: str,
+) -> Tuple[Optional[pd.Timestamp], Optional[pd.Timestamp]]:
     end_ts = _parse_timestamp(end)
     start_ts = _parse_timestamp(start)
 
     if end_ts is None:
-        end_ts = pd.Timestamp.utcnow() if any(interval.endswith(s) for s in ("m", "h")) else pd.Timestamp.today().normalize()
+        end_ts = (
+            pd.Timestamp.utcnow()
+            if any(interval.endswith(s) for s in ("m", "h"))
+            else pd.Timestamp.today().normalize()
+        )
 
     if start_ts is None and period:
         delta = _parse_period_to_timedelta(period)
@@ -171,7 +183,9 @@ class CachedYFClient:
     ) -> pd.DataFrame:
         if isinstance(tickers, list):
             if len(tickers) != 1:
-                raise NotImplementedError("CachedYFClient currently supports a single ticker per download request.")
+                raise NotImplementedError(
+                    "CachedYFClient currently supports a single ticker per download request."
+                )
             tickers = tickers[0]
 
         tickers = tickers.strip()
@@ -181,14 +195,26 @@ class CachedYFClient:
         req.end = end_ts
 
         if start_ts is None or end_ts is None:
-            fetched = yf.download(tickers, start=start, end=end, period=period, interval=interval, auto_adjust=False, **kwargs)
+            fetched = yf.download(
+                tickers,
+                start=start,
+                end=end,
+                period=period,
+                interval=interval,
+                auto_adjust=False,
+                **kwargs,
+            )
             self._persist(tickers, interval, fetched)
             return fetched
 
-        cached_frames, missing_dates = self._load_from_cache(tickers, interval, start_ts, end_ts)
+        cached_frames, missing_dates = self._load_from_cache(
+            tickers, interval, start_ts, end_ts
+        )
 
         if missing_dates:
-            new_frames = self._fetch_and_store_missing(tickers, interval, missing_dates, kwargs)
+            new_frames = self._fetch_and_store_missing(
+                tickers, interval, missing_dates, kwargs
+            )
             cached_frames.extend(new_frames)
 
         merged = _merge_dataframes(cached_frames)
@@ -246,18 +272,18 @@ class CachedYFClient:
         for start_day, end_day in _contiguous_ranges(missing_dates):
             fetch_start = pd.Timestamp(start_day)
             fetch_end = pd.Timestamp(end_day + timedelta(days=1))
-            
+
             # Check if this is intraday data and if the date range exceeds Yahoo's limits
             is_intraday = any(interval.endswith(suffix) for suffix in ("m", "h"))
             if is_intraday:
                 # Yahoo Finance has a ~30-day limit for intraday data
                 days_requested = (end_day - start_day).days + 1
                 cutoff_date = pd.Timestamp.now().normalize() - pd.Timedelta(days=30)
-                
+
                 if fetch_start.normalize() < cutoff_date:
                     # Skip dates that are too old for intraday data
                     continue
-            
+
             try:
                 fetched = yf.download(
                     ticker,
@@ -303,101 +329,125 @@ class CachedYFClient:
                 continue
             key = CacheKey(symbol=ticker, interval=interval, day=day.date())
             self.cache.store(key, day_frame)
-    
-    def get_options_expirations(self, ticker: str, use_cache: bool = True) -> Tuple[str, ...]:
+
+    def get_options_expirations(
+        self, ticker: str, use_cache: bool = True
+    ) -> Tuple[str, ...]:
         """
         Get available option expiration dates for a ticker.
-        
+
         Args:
             ticker: Stock symbol
             use_cache: Whether to use cached data if available
-            
+
         Returns:
             Tuple of expiration date strings (YYYY-MM-DD format)
         """
         ticker = ticker.strip().upper()
-        
+
         if use_cache:
             # Check if we have any cached option data
             cached_expirations = list(self.cache.iter_cached_option_expirations(ticker))
             if cached_expirations:
                 # Filter out expired dates (keep current and future dates)
                 from datetime import datetime
+
                 today = datetime.now().date()
                 valid_expirations = []
                 for exp_str in cached_expirations:
                     try:
-                        exp_date = datetime.strptime(exp_str, '%Y-%m-%d').date()
-                        if exp_date >= today:  # Keep current and future dates (>= includes today)
+                        exp_date = datetime.strptime(exp_str, "%Y-%m-%d").date()
+                        if (
+                            exp_date >= today
+                        ):  # Keep current and future dates (>= includes today)
                             valid_expirations.append(exp_str)
                     except ValueError:
                         # Skip invalid date formats
                         continue
-                
+
                 # If we have valid cached expirations, return them
                 if valid_expirations:
                     return tuple(sorted(valid_expirations))
                 # If all cached expirations are expired, fall through to fetch fresh data
-        
+
         # Fetch from yfinance
         yf_ticker = yf.Ticker(ticker)
         return yf_ticker.options
-    
-    def get_option_chain(self, ticker: str, expiration: Optional[str] = None, use_cache: bool = True, timestamp: Optional[str] = None) -> OptionChain:
+
+    def get_option_chain(
+        self,
+        ticker: str,
+        expiration: Optional[str] = None,
+        use_cache: bool = True,
+        timestamp: Optional[str] = None,
+    ) -> OptionChain:
         """
         Get option chain data for a ticker and expiration date.
-        
+
         Args:
             ticker: Stock symbol
             expiration: Expiration date in YYYY-MM-DD format. If None, uses nearest expiration.
             use_cache: Whether to use cached data if available
             timestamp: Optional timestamp for historical data storage/retrieval. If None, generates current timestamp for new data.
-            
+
         Returns:
             OptionChain with calls, puts DataFrames and underlying data
         """
         ticker = ticker.strip().upper()
-        
+
         # Get expiration date
         if expiration is None:
             expirations = self.get_options_expirations(ticker, use_cache=use_cache)
             if not expirations:
-                return OptionChain(calls=pd.DataFrame(), puts=pd.DataFrame(), underlying={})
+                return OptionChain(
+                    calls=pd.DataFrame(), puts=pd.DataFrame(), underlying={}
+                )
             expiration = expirations[0]
-        
+
         # Try to load from cache first
         if use_cache:
             calls_key = OptionCacheKey.for_calls(ticker, expiration, timestamp)
             puts_key = OptionCacheKey.for_puts(ticker, expiration, timestamp)
-            underlying_key = OptionCacheKey.for_underlying(ticker, expiration, timestamp)
-            
-            if (self.cache.has_option_chain(calls_key) and 
-                self.cache.has_option_chain(puts_key) and 
-                self.cache.has_option_chain(underlying_key)):
-                
+            underlying_key = OptionCacheKey.for_underlying(
+                ticker, expiration, timestamp
+            )
+
+            if (
+                self.cache.has_option_chain(calls_key)
+                and self.cache.has_option_chain(puts_key)
+                and self.cache.has_option_chain(underlying_key)
+            ):
+
                 calls = self.cache.load_option_chain(calls_key)
                 puts = self.cache.load_option_chain(puts_key)
                 underlying = self.cache.load_option_chain(underlying_key)
-                
+
                 if calls is not None and puts is not None and underlying is not None:
                     return OptionChain(calls=calls, puts=puts, underlying=underlying)
-        
+
         # Fetch from yfinance
         yf_ticker = yf.Ticker(ticker)
         try:
             options = yf_ticker.option_chain(expiration)
-            
+
             # Generate timestamp if not provided (for new data)
             if timestamp is None:
                 timestamp = pd.Timestamp.now().isoformat()
-            
+
             # Store in cache
             self.cache.store_option_chain(
-                ticker, expiration, options.calls, options.puts, options.underlying, timestamp
+                ticker,
+                expiration,
+                options.calls,
+                options.puts,
+                options.underlying,
+                timestamp,
             )
-            
-            return OptionChain(calls=options.calls, puts=options.puts, underlying=options.underlying)
-            
+
+            return OptionChain(
+                calls=options.calls, puts=options.puts, underlying=options.underlying
+            )
+
         except Exception as e:
             # Return empty option chain if fetch fails
             return OptionChain(calls=pd.DataFrame(), puts=pd.DataFrame(), underlying={})
@@ -419,11 +469,11 @@ def get_options_expirations(ticker: str, use_cache: bool = True) -> Tuple[str, .
     return client.get_options_expirations(ticker, use_cache=use_cache)
 
 
-def get_option_chain(ticker: str, expiration: Optional[str] = None, use_cache: bool = True) -> OptionChain:
+def get_option_chain(
+    ticker: str, expiration: Optional[str] = None, use_cache: bool = True
+) -> OptionChain:
     """
     Module-level convenience wrapper for getting option chain data.
     """
     client = CachedYFClient()
     return client.get_option_chain(ticker, expiration=expiration, use_cache=use_cache)
-
-
