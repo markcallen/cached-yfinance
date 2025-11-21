@@ -1,6 +1,7 @@
 """Tests for the client module."""
 
 from datetime import date, datetime, timedelta
+from typing import Any
 from unittest.mock import Mock, patch
 
 import pandas as pd
@@ -26,7 +27,7 @@ from cached_yfinance.client import (
 class TestDownloadRequest:
     """Test DownloadRequest functionality."""
 
-    def test_download_request_creation(self):
+    def test_download_request_creation(self) -> None:
         """Test basic DownloadRequest creation."""
         req = DownloadRequest(
             tickers="AAPL",
@@ -41,17 +42,17 @@ class TestDownloadRequest:
         assert req.end == pd.Timestamp("2023-01-31")
         assert req.kwargs == {}
 
-    def test_interval_is_intraday_daily(self):
+    def test_interval_is_intraday_daily(self) -> None:
         """Test interval_is_intraday for daily interval."""
         req = DownloadRequest("AAPL", "1d", None, None, {})
         assert not req.interval_is_intraday
 
-    def test_interval_is_intraday_minute(self):
+    def test_interval_is_intraday_minute(self) -> None:
         """Test interval_is_intraday for minute interval."""
         req = DownloadRequest("AAPL", "5m", None, None, {})
         assert req.interval_is_intraday
 
-    def test_interval_is_intraday_hour(self):
+    def test_interval_is_intraday_hour(self) -> None:
         """Test interval_is_intraday for hour interval."""
         req = DownloadRequest("AAPL", "1h", None, None, {})
         assert req.interval_is_intraday
@@ -61,8 +62,8 @@ class TestOptionChain:
     """Test OptionChain functionality."""
 
     def test_option_chain_creation(
-        self, sample_option_dataframe, sample_underlying_data
-    ):
+        self, sample_option_dataframe: pd.DataFrame, sample_underlying_data: dict[str, Any]
+    ) -> None:
         """Test OptionChain creation."""
         chain = OptionChain(
             calls=sample_option_dataframe,
@@ -80,74 +81,74 @@ class TestOptionChain:
 class TestUtilityFunctions:
     """Test utility functions."""
 
-    def test_parse_timestamp_none(self):
+    def test_parse_timestamp_none(self) -> None:
         """Test _parse_timestamp with None."""
         result = _parse_timestamp(None)
         assert result is None
 
-    def test_parse_timestamp_pandas(self):
+    def test_parse_timestamp_pandas(self) -> None:
         """Test _parse_timestamp with pandas Timestamp."""
         ts = pd.Timestamp("2023-01-01")
         result = _parse_timestamp(ts)
         assert result == ts
 
-    def test_parse_timestamp_datetime(self):
+    def test_parse_timestamp_datetime(self) -> None:
         """Test _parse_timestamp with datetime."""
         dt = datetime(2023, 1, 1)
         result = _parse_timestamp(dt)
         assert result == pd.Timestamp(dt)
 
-    def test_parse_timestamp_string(self):
+    def test_parse_timestamp_string(self) -> None:
         """Test _parse_timestamp with string."""
         result = _parse_timestamp("2023-01-01")
         assert result == pd.Timestamp("2023-01-01")
 
-    def test_parse_period_to_timedelta_none(self):
+    def test_parse_period_to_timedelta_none(self) -> None:
         """Test _parse_period_to_timedelta with None."""
         result = _parse_period_to_timedelta(None)
         assert result is None
 
-    def test_parse_period_to_timedelta_max(self):
+    def test_parse_period_to_timedelta_max(self) -> None:
         """Test _parse_period_to_timedelta with 'max'."""
         result = _parse_period_to_timedelta("max")
         assert result is None
 
-    def test_parse_period_to_timedelta_days(self):
+    def test_parse_period_to_timedelta_days(self) -> None:
         """Test _parse_period_to_timedelta with days."""
         result = _parse_period_to_timedelta("5d")
         assert result == pd.Timedelta(days=5)
 
-    def test_parse_period_to_timedelta_weeks(self):
+    def test_parse_period_to_timedelta_weeks(self) -> None:
         """Test _parse_period_to_timedelta with weeks."""
         result = _parse_period_to_timedelta("2wk")
         assert result == pd.Timedelta(weeks=2)
 
-    def test_parse_period_to_timedelta_months(self):
+    def test_parse_period_to_timedelta_months(self) -> None:
         """Test _parse_period_to_timedelta with months."""
         result = _parse_period_to_timedelta("3mo")
         assert result == pd.Timedelta(days=90)  # 3 * 30
 
-    def test_parse_period_to_timedelta_years(self):
+    def test_parse_period_to_timedelta_years(self) -> None:
         """Test _parse_period_to_timedelta with years."""
         result = _parse_period_to_timedelta("1y")
         assert result == pd.Timedelta(days=365)
 
-    def test_parse_period_to_timedelta_hours(self):
+    def test_parse_period_to_timedelta_hours(self) -> None:
         """Test _parse_period_to_timedelta with hours."""
         result = _parse_period_to_timedelta("4h")
         assert result == pd.Timedelta(hours=4)
 
-    def test_parse_period_to_timedelta_minutes(self):
+    def test_parse_period_to_timedelta_minutes(self) -> None:
         """Test _parse_period_to_timedelta with minutes."""
         result = _parse_period_to_timedelta("30m")
         assert result == pd.Timedelta(minutes=30)
 
-    def test_parse_period_to_timedelta_invalid(self):
+    def test_parse_period_to_timedelta_invalid(self) -> None:
         """Test _parse_period_to_timedelta with invalid period."""
         result = _parse_period_to_timedelta("invalid")
         assert result is None
 
-    def test_normalize_range_with_start_end(self):
+    def test_normalize_range_with_start_end(self) -> None:
         """Test _normalize_range with start and end provided."""
         start = "2023-01-01"
         end = "2023-01-31"
@@ -155,37 +156,37 @@ class TestUtilityFunctions:
         assert start_ts == pd.Timestamp("2023-01-01")
         assert end_ts == pd.Timestamp("2023-01-31")
 
-    def test_normalize_range_with_period(self):
+    def test_normalize_range_with_period(self) -> None:
         """Test _normalize_range with period."""
         start_ts, end_ts = _normalize_range(None, "2023-01-31", "5d", "1d")
         assert end_ts == pd.Timestamp("2023-01-31")
         assert start_ts == pd.Timestamp("2023-01-31") - pd.Timedelta(days=5)
 
-    def test_normalize_range_intraday_default_end(self):
+    def test_normalize_range_intraday_default_end(self) -> None:
         """Test _normalize_range with intraday interval and no end."""
         with patch("pandas.Timestamp.utcnow") as mock_now:
             mock_now.return_value = pd.Timestamp("2023-01-15 15:30:00")
             start_ts, end_ts = _normalize_range(None, None, "5d", "5m")
             assert end_ts == pd.Timestamp("2023-01-15 15:30:00")
 
-    def test_normalize_range_daily_default_end(self):
+    def test_normalize_range_daily_default_end(self) -> None:
         """Test _normalize_range with daily interval and no end."""
         with patch("pandas.Timestamp.today") as mock_today:
             mock_today.return_value = pd.Timestamp("2023-01-15")
             start_ts, end_ts = _normalize_range(None, None, "5d", "1d")
             assert end_ts == pd.Timestamp("2023-01-15").normalize()
 
-    def test_merge_dataframes_empty(self):
+    def test_merge_dataframes_empty(self) -> None:
         """Test _merge_dataframes with empty list."""
         result = _merge_dataframes([])
         assert result.empty
 
-    def test_merge_dataframes_single(self, sample_dataframe):
+    def test_merge_dataframes_single(self, sample_dataframe: pd.DataFrame) -> None:
         """Test _merge_dataframes with single DataFrame."""
         result = _merge_dataframes([sample_dataframe])
         pd.testing.assert_frame_equal(result, sample_dataframe.sort_index())
 
-    def test_merge_dataframes_multiple(self):
+    def test_merge_dataframes_multiple(self) -> None:
         """Test _merge_dataframes with multiple DataFrames."""
         df1 = pd.DataFrame({"A": [1, 2]}, index=pd.date_range("2023-01-01", periods=2))
         df2 = pd.DataFrame({"A": [3, 4]}, index=pd.date_range("2023-01-03", periods=2))
@@ -194,7 +195,7 @@ class TestUtilityFunctions:
         expected = pd.concat([df1, df2]).sort_index()
         pd.testing.assert_frame_equal(result, expected)
 
-    def test_merge_dataframes_with_duplicates(self):
+    def test_merge_dataframes_with_duplicates(self) -> None:
         """Test _merge_dataframes with duplicate indices (keeps last)."""
         df1 = pd.DataFrame({"A": [1, 2]}, index=pd.date_range("2023-01-01", periods=2))
         df2 = pd.DataFrame({"A": [3, 4]}, index=pd.date_range("2023-01-01", periods=2))
@@ -204,24 +205,24 @@ class TestUtilityFunctions:
         expected = df2.sort_index()
         pd.testing.assert_frame_equal(result, expected, check_freq=False)
 
-    def test_contiguous_ranges_empty(self):
+    def test_contiguous_ranges_empty(self) -> None:
         """Test _contiguous_ranges with empty list."""
         result = _contiguous_ranges([])
         assert result == []
 
-    def test_contiguous_ranges_single(self):
+    def test_contiguous_ranges_single(self) -> None:
         """Test _contiguous_ranges with single date."""
         dates = [date(2023, 1, 1)]
         result = _contiguous_ranges(dates)
         assert result == [(date(2023, 1, 1), date(2023, 1, 1))]
 
-    def test_contiguous_ranges_consecutive(self):
+    def test_contiguous_ranges_consecutive(self) -> None:
         """Test _contiguous_ranges with consecutive dates."""
         dates = [date(2023, 1, 1), date(2023, 1, 2), date(2023, 1, 3)]
         result = _contiguous_ranges(dates)
         assert result == [(date(2023, 1, 1), date(2023, 1, 3))]
 
-    def test_contiguous_ranges_with_gaps(self):
+    def test_contiguous_ranges_with_gaps(self) -> None:
         """Test _contiguous_ranges with gaps."""
         dates = [date(2023, 1, 1), date(2023, 1, 2), date(2023, 1, 5), date(2023, 1, 6)]
         result = _contiguous_ranges(dates)
@@ -231,13 +232,13 @@ class TestUtilityFunctions:
         ]
         assert result == expected
 
-    def test_contiguous_ranges_unsorted(self):
+    def test_contiguous_ranges_unsorted(self) -> None:
         """Test _contiguous_ranges with unsorted dates."""
         dates = [date(2023, 1, 3), date(2023, 1, 1), date(2023, 1, 2)]
         result = _contiguous_ranges(dates)
         assert result == [(date(2023, 1, 1), date(2023, 1, 3))]
 
-    def test_trading_days_inclusive_weekdays_only(self):
+    def test_trading_days_inclusive_weekdays_only(self) -> None:
         """Test _trading_days_inclusive fallback to weekdays."""
         with patch("cached_yfinance.client._nyse_calendar", return_value=None):
             start = pd.Timestamp("2023-01-01")  # Sunday
@@ -255,7 +256,7 @@ class TestUtilityFunctions:
             ]
             assert trading_days == expected
 
-    def test_trading_days_inclusive_start_after_end(self):
+    def test_trading_days_inclusive_start_after_end(self) -> None:
         """Test _trading_days_inclusive with start after end."""
         start = pd.Timestamp("2023-01-07")
         end = pd.Timestamp("2023-01-01")
@@ -267,23 +268,23 @@ class TestUtilityFunctions:
 class TestCachedYFClient:
     """Test CachedYFClient functionality."""
 
-    def test_client_initialization_default_cache(self):
+    def test_client_initialization_default_cache(self) -> None:
         """Test client initialization with default cache."""
         client = CachedYFClient()
         assert isinstance(client.cache, FileSystemCache)
 
-    def test_client_initialization_custom_cache(self, cache):
+    def test_client_initialization_custom_cache(self, cache: FileSystemCache) -> None:
         """Test client initialization with custom cache."""
         client = CachedYFClient(cache)
         assert client.cache == cache
 
-    def test_download_multiple_tickers_error(self, cache):
+    def test_download_multiple_tickers_error(self, cache: FileSystemCache) -> None:
         """Test download with multiple tickers raises error."""
         client = CachedYFClient(cache)
         with pytest.raises(NotImplementedError):
             client.download(["AAPL", "MSFT"])
 
-    def test_download_single_ticker_list(self, cache):
+    def test_download_single_ticker_list(self, cache: FileSystemCache) -> None:
         """Test download with single ticker in list."""
         client = CachedYFClient(cache)
 
@@ -293,7 +294,7 @@ class TestCachedYFClient:
             mock_download.assert_called_once()
 
     @patch("yfinance.download")
-    def test_download_no_start_end_period(self, mock_download, cache, sample_dataframe):
+    def test_download_no_start_end_period(self, mock_download: Mock, cache: FileSystemCache, sample_dataframe: pd.DataFrame) -> None:
         """Test download without start/end/period falls back to yfinance."""
         mock_download.return_value = sample_dataframe
         client = CachedYFClient(cache)
@@ -304,7 +305,7 @@ class TestCachedYFClient:
         pd.testing.assert_frame_equal(result, sample_dataframe)
 
     @patch("yfinance.download")
-    def test_download_with_cache_miss(self, mock_download, cache, sample_dataframe):
+    def test_download_with_cache_miss(self, mock_download: Mock, cache: FileSystemCache, sample_dataframe: pd.DataFrame) -> None:
         """Test download with complete cache miss."""
         mock_download.return_value = sample_dataframe
         client = CachedYFClient(cache)
@@ -317,7 +318,7 @@ class TestCachedYFClient:
         assert not result.empty
         assert len(result) <= len(sample_dataframe)
 
-    def test_download_with_cache_hit(self, cache, sample_dataframe):
+    def test_download_with_cache_hit(self, cache: FileSystemCache, sample_dataframe: pd.DataFrame) -> None:
         """Test download with complete cache hit."""
         client = CachedYFClient(cache)
 
@@ -340,7 +341,7 @@ class TestCachedYFClient:
                 assert not result.empty
 
     @patch("yfinance.download")
-    def test_download_partial_cache_hit(self, mock_download, cache, sample_dataframe):
+    def test_download_partial_cache_hit(self, mock_download: Mock, cache: FileSystemCache, sample_dataframe: pd.DataFrame) -> None:
         """Test download with partial cache hit."""
         mock_download.return_value = sample_dataframe
         client = CachedYFClient(cache)
@@ -355,7 +356,7 @@ class TestCachedYFClient:
         mock_download.assert_called()
         assert not result.empty
 
-    def test_download_timezone_handling(self, cache):
+    def test_download_timezone_handling(self, cache: FileSystemCache) -> None:
         """Test download with timezone-aware data."""
         client = CachedYFClient(cache)
 
@@ -369,7 +370,7 @@ class TestCachedYFClient:
             # Should handle timezone conversion properly
 
     @patch("yfinance.download")
-    def test_download_intraday_old_data_skip(self, mock_download, cache):
+    def test_download_intraday_old_data_skip(self, mock_download: Mock, cache: FileSystemCache) -> None:
         """Test download skips old intraday data that's beyond Yahoo's limit."""
         # Mock yfinance to raise an error for old data
         mock_download.side_effect = Exception("Data not available for 30 days")
@@ -384,7 +385,7 @@ class TestCachedYFClient:
         assert result.empty
 
     @patch("yfinance.download")
-    def test_download_intraday_unexpected_error(self, mock_download, cache):
+    def test_download_intraday_unexpected_error(self, mock_download: Mock, cache: FileSystemCache) -> None:
         """Test download re-raises unexpected errors for intraday data."""
         # Mock yfinance to raise an unexpected error
         mock_download.side_effect = Exception("Unexpected error")
@@ -400,7 +401,7 @@ class TestCachedYFClient:
                     "AAPL", start="2023-11-15", end="2023-11-15", interval="5m"
                 )
 
-    def test_persist_empty_dataframe(self, cache):
+    def test_persist_empty_dataframe(self, cache: FileSystemCache) -> None:
         """Test _persist with empty DataFrame."""
         client = CachedYFClient(cache)
         empty_df = pd.DataFrame()
@@ -408,7 +409,7 @@ class TestCachedYFClient:
         # Should not raise error
         client._persist("AAPL", "1d", empty_df)
 
-    def test_persist_non_datetime_index_error(self, cache):
+    def test_persist_non_datetime_index_error(self, cache: FileSystemCache) -> None:
         """Test _persist with non-DatetimeIndex raises error."""
         client = CachedYFClient(cache)
         df = pd.DataFrame({"Close": [100]}, index=[0])
@@ -418,7 +419,7 @@ class TestCachedYFClient:
         ):
             client._persist("AAPL", "1d", df)
 
-    def test_persist_timezone_naive_index(self, cache, sample_dataframe):
+    def test_persist_timezone_naive_index(self, cache: FileSystemCache, sample_dataframe: pd.DataFrame) -> None:
         """Test _persist with timezone-naive DatetimeIndex."""
         client = CachedYFClient(cache)
 
@@ -431,7 +432,7 @@ class TestCachedYFClient:
         )
         assert cache.has(key)
 
-    def test_persist_timezone_aware_index(self, cache):
+    def test_persist_timezone_aware_index(self, cache: FileSystemCache) -> None:
         """Test _persist with timezone-aware DatetimeIndex."""
         client = CachedYFClient(cache)
 
@@ -451,7 +452,7 @@ class TestCachedYFClientOptions:
     """Test CachedYFClient option chain functionality."""
 
     @patch("yfinance.Ticker")
-    def test_get_options_expirations_no_cache(self, mock_ticker, cache):
+    def test_get_options_expirations_no_cache(self, mock_ticker: Mock, cache: FileSystemCache) -> None:
         """Test get_options_expirations without cache."""
         mock_ticker_instance = Mock()
         mock_ticker_instance.options = ("2023-01-20", "2023-02-17")
@@ -464,10 +465,10 @@ class TestCachedYFClientOptions:
         mock_ticker.assert_called_once_with("AAPL")
 
     def test_get_options_expirations_with_cache(
-        self, cache, sample_option_dataframe, sample_underlying_data
-    ):
+        self, cache: FileSystemCache, sample_option_dataframe: pd.DataFrame, sample_underlying_data: dict[str, Any]
+    ) -> None:
         """Test get_options_expirations with cached data."""
-        client = CachedYFClient(cache)
+        CachedYFClient(cache)
 
         # Pre-populate cache with future expiration
         future_exp = "2025-01-17"  # Future date
@@ -488,8 +489,8 @@ class TestCachedYFClientOptions:
         assert all(isinstance(exp, str) for exp in cached_expirations)
 
     def test_get_options_expirations_expired_cache(
-        self, cache, sample_option_dataframe, sample_underlying_data
-    ):
+        self, cache: FileSystemCache, sample_option_dataframe: pd.DataFrame, sample_underlying_data: dict[str, Any]
+    ) -> None:
         """Test get_options_expirations filters out expired cached data."""
         client = CachedYFClient(cache)
 
@@ -516,8 +517,8 @@ class TestCachedYFClientOptions:
 
     @patch("yfinance.Ticker")
     def test_get_option_chain_no_cache(
-        self, mock_ticker, cache, sample_option_dataframe, sample_underlying_data
-    ):
+        self, mock_ticker: Mock, cache: FileSystemCache, sample_option_dataframe: pd.DataFrame, sample_underlying_data: dict[str, Any]
+    ) -> None:
         """Test get_option_chain without cache."""
         mock_ticker_instance = Mock()
         mock_options = Mock()
@@ -536,8 +537,8 @@ class TestCachedYFClientOptions:
         assert result.underlying == sample_underlying_data
 
     def test_get_option_chain_with_cache_hit(
-        self, cache, sample_option_dataframe, sample_underlying_data
-    ):
+        self, cache: FileSystemCache, sample_option_dataframe: pd.DataFrame, sample_underlying_data: dict[str, Any]
+    ) -> None:
         """Test get_option_chain with cache hit."""
         client = CachedYFClient(cache)
 
@@ -559,7 +560,7 @@ class TestCachedYFClientOptions:
         assert result.underlying == sample_underlying_data
 
     @patch("yfinance.Ticker")
-    def test_get_option_chain_no_expiration(self, mock_ticker, cache):
+    def test_get_option_chain_no_expiration(self, mock_ticker: Mock, cache: FileSystemCache) -> None:
         """Test get_option_chain without specifying expiration."""
         mock_ticker_instance = Mock()
         mock_ticker_instance.options = ("2023-01-20", "2023-02-17")
@@ -571,13 +572,13 @@ class TestCachedYFClientOptions:
         mock_ticker.return_value = mock_ticker_instance
 
         client = CachedYFClient(cache)
-        result = client.get_option_chain("AAPL", use_cache=False)
+        client.get_option_chain("AAPL", use_cache=False)
 
         # Should use first available expiration
         mock_ticker_instance.option_chain.assert_called_with("2023-01-20")
 
     @patch("yfinance.Ticker")
-    def test_get_option_chain_no_expirations_available(self, mock_ticker, cache):
+    def test_get_option_chain_no_expirations_available(self, mock_ticker: Mock, cache: FileSystemCache) -> None:
         """Test get_option_chain when no expirations are available."""
         mock_ticker_instance = Mock()
         mock_ticker_instance.options = ()
@@ -593,7 +594,7 @@ class TestCachedYFClientOptions:
         assert result.underlying == {}
 
     @patch("yfinance.Ticker")
-    def test_get_option_chain_fetch_error(self, mock_ticker, cache):
+    def test_get_option_chain_fetch_error(self, mock_ticker: Mock, cache: FileSystemCache) -> None:
         """Test get_option_chain when yfinance fetch fails."""
         mock_ticker_instance = Mock()
         mock_ticker_instance.option_chain.side_effect = Exception("Fetch failed")
@@ -610,8 +611,8 @@ class TestCachedYFClientOptions:
 
     @patch("yfinance.Ticker")
     def test_get_option_chain_with_timestamp(
-        self, mock_ticker, cache, sample_option_dataframe, sample_underlying_data
-    ):
+        self, mock_ticker: Mock, cache: FileSystemCache, sample_option_dataframe: pd.DataFrame, sample_underlying_data: dict[str, Any]
+    ) -> None:
         """Test get_option_chain with custom timestamp."""
         mock_ticker_instance = Mock()
         mock_options = Mock()
@@ -641,7 +642,7 @@ class TestModuleLevelFunctions:
     """Test module-level convenience functions."""
 
     @patch("cached_yfinance.client.CachedYFClient")
-    def test_download_function(self, mock_client_class):
+    def test_download_function(self, mock_client_class: Mock) -> None:
         """Test module-level download function."""
         mock_client = Mock()
         mock_client.download.return_value = pd.DataFrame()
@@ -654,7 +655,7 @@ class TestModuleLevelFunctions:
         assert isinstance(result, pd.DataFrame)
 
     @patch("cached_yfinance.client.CachedYFClient")
-    def test_get_options_expirations_function(self, mock_client_class):
+    def test_get_options_expirations_function(self, mock_client_class: Mock) -> None:
         """Test module-level get_options_expirations function."""
         mock_client = Mock()
         mock_client.get_options_expirations.return_value = ("2023-01-20",)
@@ -669,7 +670,7 @@ class TestModuleLevelFunctions:
         assert result == ("2023-01-20",)
 
     @patch("cached_yfinance.client.CachedYFClient")
-    def test_get_option_chain_function(self, mock_client_class):
+    def test_get_option_chain_function(self, mock_client_class: Mock) -> None:
         """Test module-level get_option_chain function."""
         mock_client = Mock()
         mock_option_chain = OptionChain(

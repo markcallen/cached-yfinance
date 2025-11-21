@@ -309,7 +309,7 @@ def list_expirations(ticker: str, cache_dir: str = None) -> None:
                     status = "expires today"
                 else:
                     status = f"{days_until} days"
-            except:
+            except Exception:
                 status = "unknown"
 
             print(f"  {i:2d}. {exp} ({status})")
