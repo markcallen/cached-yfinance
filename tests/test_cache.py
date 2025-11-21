@@ -188,7 +188,9 @@ class TestFileSystemCache:
         result = cache.load(key)
         assert result is None
 
-    def test_store_and_load_dataframe(self, cache: FileSystemCache, sample_dataframe: pd.DataFrame) -> None:
+    def test_store_and_load_dataframe(
+        self, cache: FileSystemCache, sample_dataframe: pd.DataFrame
+    ) -> None:
         """Test storing and loading a DataFrame."""
         key = CacheKey(symbol="AAPL", interval="1d", day=date(2023, 1, 1))
 
@@ -212,7 +214,9 @@ class TestFileSystemCache:
         cache.store(key, empty_df)
         assert not cache.has(key)
 
-    def test_store_creates_metadata(self, cache: FileSystemCache, sample_dataframe: pd.DataFrame) -> None:
+    def test_store_creates_metadata(
+        self, cache: FileSystemCache, sample_dataframe: pd.DataFrame
+    ) -> None:
         """Test that storing creates metadata file."""
         key = CacheKey(symbol="AAPL", interval="1d", day=date(2023, 1, 1))
         cache.store(key, sample_dataframe)
@@ -234,7 +238,9 @@ class TestFileSystemCache:
         days = list(cache.iter_cached_days("AAPL", "1d"))
         assert days == []
 
-    def test_iter_cached_days_with_data(self, cache: FileSystemCache, sample_dataframe: pd.DataFrame) -> None:
+    def test_iter_cached_days_with_data(
+        self, cache: FileSystemCache, sample_dataframe: pd.DataFrame
+    ) -> None:
         """Test iter_cached_days with cached data."""
         dates = [date(2023, 1, 1), date(2023, 1, 2), date(2023, 1, 3)]
 
@@ -340,7 +346,10 @@ class TestFileSystemCacheOptions:
         assert result is None
 
     def test_store_and_load_option_chain(
-        self, cache: FileSystemCache, sample_option_dataframe: pd.DataFrame, sample_underlying_data: dict[str, Any]
+        self,
+        cache: FileSystemCache,
+        sample_option_dataframe: pd.DataFrame,
+        sample_underlying_data: dict[str, Any],
     ) -> None:
         """Test storing and loading complete option chain."""
         symbol = "AAPL"
@@ -378,7 +387,10 @@ class TestFileSystemCacheOptions:
         assert loaded_underlying == sample_underlying_data
 
     def test_store_option_chain_with_timestamp(
-        self, cache: FileSystemCache, sample_option_dataframe: pd.DataFrame, sample_underlying_data: dict[str, Any]
+        self,
+        cache: FileSystemCache,
+        sample_option_dataframe: pd.DataFrame,
+        sample_underlying_data: dict[str, Any],
     ) -> None:
         """Test storing option chain with timestamp."""
         symbol = "AAPL"
@@ -401,7 +413,9 @@ class TestFileSystemCacheOptions:
         loaded_calls = cache.load_option_chain(calls_key)
         pd.testing.assert_frame_equal(loaded_calls, sample_option_dataframe)
 
-    def test_store_option_chain_empty_dataframes(self, cache: FileSystemCache, sample_underlying_data: dict[str, Any]) -> None:
+    def test_store_option_chain_empty_dataframes(
+        self, cache: FileSystemCache, sample_underlying_data: dict[str, Any]
+    ) -> None:
         """Test storing option chain with empty DataFrames."""
         symbol = "AAPL"
         expiration = "2023-01-20"
@@ -431,7 +445,10 @@ class TestFileSystemCacheOptions:
         assert expirations == []
 
     def test_iter_cached_option_expirations_with_data(
-        self, cache: FileSystemCache, sample_option_dataframe: pd.DataFrame, sample_underlying_data: dict[str, Any]
+        self,
+        cache: FileSystemCache,
+        sample_option_dataframe: pd.DataFrame,
+        sample_underlying_data: dict[str, Any],
     ) -> None:
         """Test iter_cached_option_expirations with cached data."""
         symbol = "AAPL"
@@ -455,7 +472,10 @@ class TestFileSystemCacheOptions:
         assert timestamps == []
 
     def test_iter_cached_option_timestamps_with_data(
-        self, cache: FileSystemCache, sample_option_dataframe: pd.DataFrame, sample_underlying_data: dict[str, Any]
+        self,
+        cache: FileSystemCache,
+        sample_option_dataframe: pd.DataFrame,
+        sample_underlying_data: dict[str, Any],
     ) -> None:
         """Test iter_cached_option_timestamps with cached data."""
         symbol = "AAPL"
