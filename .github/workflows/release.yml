@@ -44,7 +44,7 @@ jobs:
       - name: Update version in pyproject.toml
         run: |
           # Update the version in pyproject.toml to match the tag
-          sed -i 's/^version = .*/version = "${{ steps.version.outputs.version }}"/' pyproject.toml
+          sed -i "s/^version = .*/version = \"${{ steps.version.outputs.version }}\"/" pyproject.toml
 
       - name: Build package
         run: |
