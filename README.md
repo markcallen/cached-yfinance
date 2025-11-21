@@ -227,6 +227,131 @@ if cache_dir.exists():
     print(f"Removed cache directory: {cache_dir}")
 ```
 
+## 🐳 Docker Usage
+
+You can run the data download tool using Docker without installing Python dependencies locally.
+
+### Using Pre-built Images
+
+Pre-built Docker images are available on Docker Hub for both AMD64 and ARM64 architectures:
+
+```bash
+# Pull the latest version
+docker pull markcallen/cached-yfinance:latest
+
+# Or pull a specific version
+docker pull markcallen/cached-yfinance:v0.1.0
+```
+
+### Building the Docker Image Locally
+
+If you prefer to build the image yourself:
+
+#### Basic Build
+
+```bash
+docker build -t cached-yfinance:local .
+```
+
+This will create an image with version label "local".
+
+### Environment Variables
+
+The Docker container accepts the following environment variables:
+
+- **`TICKER`** (required): Stock ticker symbol (e.g., "AAPL", "IWM", "TSLA")
+- **`INTERVAL`** (optional): Data interval, default "1d"
+  - Valid values: 1m, 5m, 15m, 30m, 1h, 1d, 5d, 1wk, 1mo, 3mo
+- **`DAYS`** (optional): Number of days to go back, default "60"
+  - Maximum 60 for intraday intervals (intervals ending with 'm' or 'h')
+- **`CACHE_DIR`** (optional): Cache directory path inside container, default "/cache"
+
+### Usage Examples
+
+#### Basic Usage - Daily Data
+
+```bash
+docker run --rm \
+  -e TICKER=AAPL \
+  -v $(pwd)/cache:/cache \
+  markcallen/cached-yfinance:latest
+```
+
+#### Download 1-minute Data for 30 Days
+
+```bash
+docker run --rm \
+  -e TICKER=IWM \
+  -e INTERVAL=1m \
+  -e DAYS=30 \
+  -v $(pwd)/cache:/cache \
+  markcallen/cached-yfinance:latest
+```
+
+#### Download Hourly Data for 90 Days
+
+```bash
+docker run --rm \
+  -e TICKER=TSLA \
+  -e INTERVAL=1h \
+  -e DAYS=90 \
+  -v $(pwd)/cache:/cache \
+  markcallen/cached-yfinance:latest
+```
+
+#### Using Custom Cache Directory
+
+```bash
+docker run --rm \
+  -e TICKER=MSFT \
+  -e INTERVAL=1d \
+  -e DAYS=365 \
+  -v /path/to/your/cache:/cache \
+  markcallen/cached-yfinance:latest
+```
+
+### Volume Mounting
+
+Always mount a volume to `/cache` to persist the downloaded data:
+
+```bash
+-v $(pwd)/cache:/cache
+```
+
+This ensures that:
+
+1. Downloaded data persists after the container stops
+2. Subsequent runs can reuse cached data for better performance
+3. You can access the cached data from your host system
+
+### Container Output
+
+The container provides detailed output including:
+
+- Configuration summary
+- Download progress
+- Data statistics
+- Cache information
+
+Example output:
+
+```
+🐳 Starting download with:
+   TICKER: AAPL
+   INTERVAL: 1d
+   DAYS: 60
+   CACHE_DIR: /cache
+
+📈 Downloading 60-day 1d data for AAPL...
+📁 Using custom cache directory: /cache
+📅 Date range: 2024-09-22 to 2024-11-21
+✅ Successfully downloaded data for AAPL
+📊 Data points: 43
+📅 Date range: 2024-09-23 09:30 to 2024-11-20 16:00
+💰 Price range: $213.92 - $237.49
+📈 Latest close: $229.87
+```
+
 ## 📊 Performance Benefits
 
 Cached YFinance can provide significant performance improvements:

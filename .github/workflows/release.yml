@@ -71,8 +71,11 @@ jobs:
             ### Downloads
             - **Wheel package**: `cached_yfinance-${{ steps.version.outputs.version }}-py3-none-any.whl`
             - **Source distribution**: `cached_yfinance-${{ steps.version.outputs.version }}.tar.gz`
+            - **Docker image**: `markcallen/cached-yfinance:${{ steps.version.outputs.version }}`
 
             ### Installation
+
+            #### Python Package
             ```bash
             pip install cached-yfinance==${{ steps.version.outputs.version }}
             ```
@@ -81,6 +84,25 @@ jobs:
             ```bash
             pip install cached_yfinance-${{ steps.version.outputs.version }}-py3-none-any.whl
             ```
+
+            #### Docker Image
+            ```bash
+            # Pull the specific version
+            docker pull markcallen/cached-yfinance:${{ steps.version.outputs.version }}
+
+            # Or use the latest tag
+            docker pull markcallen/cached-yfinance:latest
+
+            # Run with environment variables
+            docker run --rm \
+              -e TICKER=AAPL \
+              -e INTERVAL=1d \
+              -e DAYS=60 \
+              -v $(pwd)/cache:/cache \
+              markcallen/cached-yfinance:${{ steps.version.outputs.version }}
+            ```
+
+            The Docker image supports both AMD64 and ARM64 architectures.
           draft: false
           prerelease: false
 
@@ -103,3 +125,37 @@ jobs:
           asset_path: ./dist/cached_yfinance-${{ steps.version.outputs.version }}.tar.gz
           asset_name: cached_yfinance-${{ steps.version.outputs.version }}.tar.gz
           asset_content_type: application/gzip
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: markcallen
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: markcallen/cached-yfinance
+          tags: |
+            type=ref,event=tag
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            VERSION=${{ steps.version.outputs.version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
