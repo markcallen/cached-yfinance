@@ -1,0 +1,105 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*" # Triggers on version tags like v1.0.0, v1.2.3, etc.
+
+permissions:
+  contents: write # Required for creating releases
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Fetch full history for proper versioning
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+
+      - name: Install build dependencies
+        run: |
+          uv sync
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          # Remove 'v' prefix from tag to get version number
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+      - name: Update version in pyproject.toml
+        run: |
+          # Update the version in pyproject.toml to match the tag
+          sed -i 's/^version = .*/version = "${{ steps.version.outputs.version }}"/' pyproject.toml
+
+      - name: Build package
+        run: |
+          uv build
+
+      - name: Verify build artifacts
+        run: |
+          ls -la dist/
+          echo "Built artifacts:"
+          for file in dist/*; do
+            echo "  - $(basename "$file")"
+          done
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          release_name: Release ${{ steps.version.outputs.tag }}
+          body: |
+            ## Release ${{ steps.version.outputs.tag }}
+
+            ### Downloads
+            - **Wheel package**: `cached_yfinance-${{ steps.version.outputs.version }}-py3-none-any.whl`
+            - **Source distribution**: `cached_yfinance-${{ steps.version.outputs.version }}.tar.gz`
+
+            ### Installation
+            ```bash
+            pip install cached-yfinance==${{ steps.version.outputs.version }}
+            ```
+
+            Or download the wheel/source files below and install locally:
+            ```bash
+            pip install cached_yfinance-${{ steps.version.outputs.version }}-py3-none-any.whl
+            ```
+          draft: false
+          prerelease: false
+
+      - name: Upload Wheel Artifact
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./dist/cached_yfinance-${{ steps.version.outputs.version }}-py3-none-any.whl
+          asset_name: cached_yfinance-${{ steps.version.outputs.version }}-py3-none-any.whl
+          asset_content_type: application/zip
+
+      - name: Upload Source Distribution
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./dist/cached_yfinance-${{ steps.version.outputs.version }}.tar.gz
+          asset_name: cached_yfinance-${{ steps.version.outputs.version }}.tar.gz
+          asset_content_type: application/gzip
