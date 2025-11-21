@@ -26,7 +26,8 @@ def cache(temp_cache_dir: Path) -> FileSystemCache:
 @pytest.fixture
 def sample_dataframe() -> pd.DataFrame:
     """Create a sample DataFrame for testing."""
-    dates = pd.date_range("2023-01-01", periods=5, freq="D")
+    # Use trading days starting from Jan 3, 2023 (Tuesday)
+    dates = pd.date_range("2023-01-03", periods=5, freq="B")  # B = business days
     return pd.DataFrame(
         {
             "Open": [100.0, 101.0, 102.0, 103.0, 104.0],

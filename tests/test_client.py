@@ -62,7 +62,9 @@ class TestOptionChain:
     """Test OptionChain functionality."""
 
     def test_option_chain_creation(
-        self, sample_option_dataframe: pd.DataFrame, sample_underlying_data: dict[str, Any]
+        self,
+        sample_option_dataframe: pd.DataFrame,
+        sample_underlying_data: dict[str, Any],
     ) -> None:
         """Test OptionChain creation."""
         chain = OptionChain(
@@ -290,11 +292,16 @@ class TestCachedYFClient:
 
         with patch("yfinance.download") as mock_download:
             mock_download.return_value = pd.DataFrame()
-            client.download(["AAPL"], start="2023-01-01", end="2023-01-02")
+            client.download(["AAPL"], start="2023-01-03", end="2023-01-04")
             mock_download.assert_called_once()
 
     @patch("yfinance.download")
-    def test_download_no_start_end_period(self, mock_download: Mock, cache: FileSystemCache, sample_dataframe: pd.DataFrame) -> None:
+    def test_download_no_start_end_period(
+        self,
+        mock_download: Mock,
+        cache: FileSystemCache,
+        sample_dataframe: pd.DataFrame,
+    ) -> None:
         """Test download without start/end/period falls back to yfinance."""
         mock_download.return_value = sample_dataframe
         client = CachedYFClient(cache)
@@ -305,12 +312,17 @@ class TestCachedYFClient:
         pd.testing.assert_frame_equal(result, sample_dataframe)
 
     @patch("yfinance.download")
-    def test_download_with_cache_miss(self, mock_download: Mock, cache: FileSystemCache, sample_dataframe: pd.DataFrame) -> None:
+    def test_download_with_cache_miss(
+        self,
+        mock_download: Mock,
+        cache: FileSystemCache,
+        sample_dataframe: pd.DataFrame,
+    ) -> None:
         """Test download with complete cache miss."""
         mock_download.return_value = sample_dataframe
         client = CachedYFClient(cache)
 
-        result = client.download("AAPL", start="2023-01-01", end="2023-01-02")
+        result = client.download("AAPL", start="2023-01-03", end="2023-01-04")
 
         # Should call yfinance for missing data
         mock_download.assert_called()
@@ -318,39 +330,40 @@ class TestCachedYFClient:
         assert not result.empty
         assert len(result) <= len(sample_dataframe)
 
-    def test_download_with_cache_hit(self, cache: FileSystemCache, sample_dataframe: pd.DataFrame) -> None:
+    def test_download_with_cache_hit(
+        self, cache: FileSystemCache, sample_dataframe: pd.DataFrame
+    ) -> None:
         """Test download with complete cache hit."""
         client = CachedYFClient(cache)
 
         # Pre-populate cache with data for the specific day
-        key = CacheKey(symbol="AAPL", interval="1d", day=date(2023, 1, 1))
+        key = CacheKey(symbol="AAPL", interval="1d", day=date(2023, 1, 3))
         cache.store(key, sample_dataframe)
 
         with patch("yfinance.download") as mock_download:
-            # Mock _trading_days_inclusive to return the expected day
-            with patch(
-                "cached_yfinance.client._trading_days_inclusive"
-            ) as mock_trading_days:
-                mock_trading_days.return_value = [date(2023, 1, 1)]
+            result = client.download("AAPL", start="2023-01-03", end="2023-01-03")
 
-                result = client.download("AAPL", start="2023-01-01", end="2023-01-01")
-
-                # Should not call yfinance
-                mock_download.assert_not_called()
-                # Result should contain cached data
-                assert not result.empty
+            # Should not call yfinance since data is cached
+            mock_download.assert_not_called()
+            # Result should contain cached data
+            assert not result.empty
 
     @patch("yfinance.download")
-    def test_download_partial_cache_hit(self, mock_download: Mock, cache: FileSystemCache, sample_dataframe: pd.DataFrame) -> None:
+    def test_download_partial_cache_hit(
+        self,
+        mock_download: Mock,
+        cache: FileSystemCache,
+        sample_dataframe: pd.DataFrame,
+    ) -> None:
         """Test download with partial cache hit."""
         mock_download.return_value = sample_dataframe
         client = CachedYFClient(cache)
 
         # Pre-populate cache for one day
-        key1 = CacheKey(symbol="AAPL", interval="1d", day=date(2023, 1, 1))
+        key1 = CacheKey(symbol="AAPL", interval="1d", day=date(2023, 1, 3))
         cache.store(key1, sample_dataframe)
 
-        result = client.download("AAPL", start="2023-01-01", end="2023-01-02")
+        result = client.download("AAPL", start="2023-01-03", end="2023-01-04")
 
         # Should call yfinance for missing day
         mock_download.assert_called()
@@ -361,16 +374,18 @@ class TestCachedYFClient:
         client = CachedYFClient(cache)
 
         # Create timezone-aware sample data
-        dates = pd.date_range("2023-01-01", periods=2, freq="D", tz="US/Eastern")
+        dates = pd.date_range("2023-01-03", periods=2, freq="D", tz="US/Eastern")
         tz_dataframe = pd.DataFrame({"Close": [100.0, 101.0]}, index=dates)
 
         with patch("yfinance.download", return_value=tz_dataframe):
-            result = client.download("AAPL", start="2023-01-01", end="2023-01-02")
+            result = client.download("AAPL", start="2023-01-03", end="2023-01-04")
             assert not result.empty
             # Should handle timezone conversion properly
 
     @patch("yfinance.download")
-    def test_download_intraday_old_data_skip(self, mock_download: Mock, cache: FileSystemCache) -> None:
+    def test_download_intraday_old_data_skip(
+        self, mock_download: Mock, cache: FileSystemCache
+    ) -> None:
         """Test download skips old intraday data that's beyond Yahoo's limit."""
         # Mock yfinance to raise an error for old data
         mock_download.side_effect = Exception("Data not available for 30 days")
@@ -385,7 +400,9 @@ class TestCachedYFClient:
         assert result.empty
 
     @patch("yfinance.download")
-    def test_download_intraday_unexpected_error(self, mock_download: Mock, cache: FileSystemCache) -> None:
+    def test_download_intraday_unexpected_error(
+        self, mock_download: Mock, cache: FileSystemCache
+    ) -> None:
         """Test download re-raises unexpected errors for intraday data."""
         # Mock yfinance to raise an unexpected error
         mock_download.side_effect = Exception("Unexpected error")
@@ -419,7 +436,9 @@ class TestCachedYFClient:
         ):
             client._persist("AAPL", "1d", df)
 
-    def test_persist_timezone_naive_index(self, cache: FileSystemCache, sample_dataframe: pd.DataFrame) -> None:
+    def test_persist_timezone_naive_index(
+        self, cache: FileSystemCache, sample_dataframe: pd.DataFrame
+    ) -> None:
         """Test _persist with timezone-naive DatetimeIndex."""
         client = CachedYFClient(cache)
 
@@ -452,7 +471,9 @@ class TestCachedYFClientOptions:
     """Test CachedYFClient option chain functionality."""
 
     @patch("yfinance.Ticker")
-    def test_get_options_expirations_no_cache(self, mock_ticker: Mock, cache: FileSystemCache) -> None:
+    def test_get_options_expirations_no_cache(
+        self, mock_ticker: Mock, cache: FileSystemCache
+    ) -> None:
         """Test get_options_expirations without cache."""
         mock_ticker_instance = Mock()
         mock_ticker_instance.options = ("2023-01-20", "2023-02-17")
@@ -465,7 +486,10 @@ class TestCachedYFClientOptions:
         mock_ticker.assert_called_once_with("AAPL")
 
     def test_get_options_expirations_with_cache(
-        self, cache: FileSystemCache, sample_option_dataframe: pd.DataFrame, sample_underlying_data: dict[str, Any]
+        self,
+        cache: FileSystemCache,
+        sample_option_dataframe: pd.DataFrame,
+        sample_underlying_data: dict[str, Any],
     ) -> None:
         """Test get_options_expirations with cached data."""
         CachedYFClient(cache)
@@ -489,7 +513,10 @@ class TestCachedYFClientOptions:
         assert all(isinstance(exp, str) for exp in cached_expirations)
 
     def test_get_options_expirations_expired_cache(
-        self, cache: FileSystemCache, sample_option_dataframe: pd.DataFrame, sample_underlying_data: dict[str, Any]
+        self,
+        cache: FileSystemCache,
+        sample_option_dataframe: pd.DataFrame,
+        sample_underlying_data: dict[str, Any],
     ) -> None:
         """Test get_options_expirations filters out expired cached data."""
         client = CachedYFClient(cache)
@@ -517,7 +544,11 @@ class TestCachedYFClientOptions:
 
     @patch("yfinance.Ticker")
     def test_get_option_chain_no_cache(
-        self, mock_ticker: Mock, cache: FileSystemCache, sample_option_dataframe: pd.DataFrame, sample_underlying_data: dict[str, Any]
+        self,
+        mock_ticker: Mock,
+        cache: FileSystemCache,
+        sample_option_dataframe: pd.DataFrame,
+        sample_underlying_data: dict[str, Any],
     ) -> None:
         """Test get_option_chain without cache."""
         mock_ticker_instance = Mock()
@@ -537,7 +568,10 @@ class TestCachedYFClientOptions:
         assert result.underlying == sample_underlying_data
 
     def test_get_option_chain_with_cache_hit(
-        self, cache: FileSystemCache, sample_option_dataframe: pd.DataFrame, sample_underlying_data: dict[str, Any]
+        self,
+        cache: FileSystemCache,
+        sample_option_dataframe: pd.DataFrame,
+        sample_underlying_data: dict[str, Any],
     ) -> None:
         """Test get_option_chain with cache hit."""
         client = CachedYFClient(cache)
@@ -560,7 +594,9 @@ class TestCachedYFClientOptions:
         assert result.underlying == sample_underlying_data
 
     @patch("yfinance.Ticker")
-    def test_get_option_chain_no_expiration(self, mock_ticker: Mock, cache: FileSystemCache) -> None:
+    def test_get_option_chain_no_expiration(
+        self, mock_ticker: Mock, cache: FileSystemCache
+    ) -> None:
         """Test get_option_chain without specifying expiration."""
         mock_ticker_instance = Mock()
         mock_ticker_instance.options = ("2023-01-20", "2023-02-17")
@@ -578,7 +614,9 @@ class TestCachedYFClientOptions:
         mock_ticker_instance.option_chain.assert_called_with("2023-01-20")
 
     @patch("yfinance.Ticker")
-    def test_get_option_chain_no_expirations_available(self, mock_ticker: Mock, cache: FileSystemCache) -> None:
+    def test_get_option_chain_no_expirations_available(
+        self, mock_ticker: Mock, cache: FileSystemCache
+    ) -> None:
         """Test get_option_chain when no expirations are available."""
         mock_ticker_instance = Mock()
         mock_ticker_instance.options = ()
@@ -594,7 +632,9 @@ class TestCachedYFClientOptions:
         assert result.underlying == {}
 
     @patch("yfinance.Ticker")
-    def test_get_option_chain_fetch_error(self, mock_ticker: Mock, cache: FileSystemCache) -> None:
+    def test_get_option_chain_fetch_error(
+        self, mock_ticker: Mock, cache: FileSystemCache
+    ) -> None:
         """Test get_option_chain when yfinance fetch fails."""
         mock_ticker_instance = Mock()
         mock_ticker_instance.option_chain.side_effect = Exception("Fetch failed")
@@ -611,7 +651,11 @@ class TestCachedYFClientOptions:
 
     @patch("yfinance.Ticker")
     def test_get_option_chain_with_timestamp(
-        self, mock_ticker: Mock, cache: FileSystemCache, sample_option_dataframe: pd.DataFrame, sample_underlying_data: dict[str, Any]
+        self,
+        mock_ticker: Mock,
+        cache: FileSystemCache,
+        sample_option_dataframe: pd.DataFrame,
+        sample_underlying_data: dict[str, Any],
     ) -> None:
         """Test get_option_chain with custom timestamp."""
         mock_ticker_instance = Mock()
