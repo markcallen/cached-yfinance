@@ -37,18 +37,19 @@ class OptionCacheKey:
     symbol: str
     expiration_date: str
     data_type: str  # 'calls', 'puts', or 'underlying'
+    timestamp: Optional[str] = None  # ISO format timestamp for historical data
 
     @classmethod
-    def for_calls(cls, symbol: str, expiration_date: str) -> "OptionCacheKey":
-        return cls(symbol=symbol, expiration_date=expiration_date, data_type="calls")
+    def for_calls(cls, symbol: str, expiration_date: str, timestamp: Optional[str] = None) -> "OptionCacheKey":
+        return cls(symbol=symbol, expiration_date=expiration_date, data_type="calls", timestamp=timestamp)
     
     @classmethod
-    def for_puts(cls, symbol: str, expiration_date: str) -> "OptionCacheKey":
-        return cls(symbol=symbol, expiration_date=expiration_date, data_type="puts")
+    def for_puts(cls, symbol: str, expiration_date: str, timestamp: Optional[str] = None) -> "OptionCacheKey":
+        return cls(symbol=symbol, expiration_date=expiration_date, data_type="puts", timestamp=timestamp)
     
     @classmethod
-    def for_underlying(cls, symbol: str, expiration_date: str) -> "OptionCacheKey":
-        return cls(symbol=symbol, expiration_date=expiration_date, data_type="underlying")
+    def for_underlying(cls, symbol: str, expiration_date: str, timestamp: Optional[str] = None) -> "OptionCacheKey":
+        return cls(symbol=symbol, expiration_date=expiration_date, data_type="underlying", timestamp=timestamp)
 
 
 class FileSystemCache:
@@ -73,15 +74,34 @@ class FileSystemCache:
     def _meta_path(self, symbol: str, interval: str, day: date) -> Path:
         return self._base_dir(symbol, interval, day) / f"{day:%Y-%m-%d}-{interval}.json"
     
-    def _option_base_dir(self, symbol: str, expiration_date: str) -> Path:
+    def _option_base_dir(self, symbol: str, expiration_date: str, timestamp: Optional[str] = None) -> Path:
         sym = _sanitize_symbol(symbol)
-        return self.root / sym / "options" / expiration_date
+        if timestamp:
+            # For timestamped data, organize by date then time
+            ts = pd.Timestamp(timestamp)
+            date_str = ts.strftime('%Y-%m-%d')
+            return self.root / sym / "options" / expiration_date / "historical" / date_str
+        else:
+            # For current data (backward compatibility)
+            return self.root / sym / "options" / expiration_date
     
-    def _option_data_path(self, symbol: str, expiration_date: str, data_type: str) -> Path:
-        return self._option_base_dir(symbol, expiration_date) / f"{data_type}.parquet"
+    def _option_data_path(self, symbol: str, expiration_date: str, data_type: str, timestamp: Optional[str] = None) -> Path:
+        base_dir = self._option_base_dir(symbol, expiration_date, timestamp)
+        if timestamp:
+            ts = pd.Timestamp(timestamp)
+            time_str = ts.strftime('%H%M%S')
+            return base_dir / f"{data_type}_{time_str}.parquet"
+        else:
+            return base_dir / f"{data_type}.parquet"
     
-    def _option_meta_path(self, symbol: str, expiration_date: str) -> Path:
-        return self._option_base_dir(symbol, expiration_date) / "metadata.json"
+    def _option_meta_path(self, symbol: str, expiration_date: str, timestamp: Optional[str] = None) -> Path:
+        base_dir = self._option_base_dir(symbol, expiration_date, timestamp)
+        if timestamp:
+            ts = pd.Timestamp(timestamp)
+            time_str = ts.strftime('%H%M%S')
+            return base_dir / f"metadata_{time_str}.json"
+        else:
+            return base_dir / "metadata.json"
 
     def has(self, key: CacheKey) -> bool:
         return self._data_path(key.symbol, key.interval, key.day).exists()
@@ -112,20 +132,20 @@ class FileSystemCache:
     def has_option_chain(self, key: OptionCacheKey) -> bool:
         """Check if option chain data exists in cache."""
         if key.data_type in ("calls", "puts"):
-            return self._option_data_path(key.symbol, key.expiration_date, key.data_type).exists()
+            return self._option_data_path(key.symbol, key.expiration_date, key.data_type, key.timestamp).exists()
         elif key.data_type == "underlying":
-            return self._option_meta_path(key.symbol, key.expiration_date).exists()
+            return self._option_meta_path(key.symbol, key.expiration_date, key.timestamp).exists()
         return False
     
     def load_option_chain(self, key: OptionCacheKey) -> Optional[pd.DataFrame | dict]:
         """Load option chain data from cache."""
         if key.data_type in ("calls", "puts"):
-            path = self._option_data_path(key.symbol, key.expiration_date, key.data_type)
+            path = self._option_data_path(key.symbol, key.expiration_date, key.data_type, key.timestamp)
             if not path.exists():
                 return None
             return pd.read_parquet(path)
         elif key.data_type == "underlying":
-            path = self._option_meta_path(key.symbol, key.expiration_date)
+            path = self._option_meta_path(key.symbol, key.expiration_date, key.timestamp)
             if not path.exists():
                 return None
             with open(path, "r", encoding="utf-8") as f:
@@ -133,25 +153,26 @@ class FileSystemCache:
             return data.get("underlying")
         return None
     
-    def store_option_chain(self, symbol: str, expiration_date: str, calls: pd.DataFrame, puts: pd.DataFrame, underlying: dict) -> None:
+    def store_option_chain(self, symbol: str, expiration_date: str, calls: pd.DataFrame, puts: pd.DataFrame, underlying: dict, timestamp: Optional[str] = None) -> None:
         """Store complete option chain data in cache."""
-        base_dir = self._option_base_dir(symbol, expiration_date)
+        base_dir = self._option_base_dir(symbol, expiration_date, timestamp)
         base_dir.mkdir(parents=True, exist_ok=True)
         
         # Store calls and puts DataFrames
         if not calls.empty:
-            calls_path = self._option_data_path(symbol, expiration_date, "calls")
+            calls_path = self._option_data_path(symbol, expiration_date, "calls", timestamp)
             calls.to_parquet(calls_path)
         
         if not puts.empty:
-            puts_path = self._option_data_path(symbol, expiration_date, "puts")
+            puts_path = self._option_data_path(symbol, expiration_date, "puts", timestamp)
             puts.to_parquet(puts_path)
         
         # Store metadata including underlying data
+        cache_timestamp = timestamp if timestamp else pd.Timestamp.utcnow().isoformat()
         meta = {
             "symbol": symbol,
             "expiration_date": expiration_date,
-            "cached_at": pd.Timestamp.utcnow().isoformat(),
+            "cached_at": cache_timestamp,
             "calls_rows": int(len(calls)) if not calls.empty else 0,
             "puts_rows": int(len(puts)) if not puts.empty else 0,
             "calls_columns": list(calls.columns) if not calls.empty else [],
@@ -159,7 +180,7 @@ class FileSystemCache:
             "underlying": underlying,
         }
         
-        meta_path = self._option_meta_path(symbol, expiration_date)
+        meta_path = self._option_meta_path(symbol, expiration_date, timestamp)
         with open(meta_path, "w", encoding="utf-8") as f:
             json.dump(meta, f, indent=2)
 
@@ -189,5 +210,28 @@ class FileSystemCache:
         for exp_dir in sorted(options_dir.glob("*")):
             if exp_dir.is_dir():
                 yield exp_dir.name
+    
+    def iter_cached_option_timestamps(self, symbol: str, expiration_date: str) -> Iterable[str]:
+        """Iterate over cached timestamps for a specific symbol and expiration."""
+        historical_dir = self.root / _sanitize_symbol(symbol) / "options" / expiration_date / "historical"
+        if not historical_dir.exists():
+            return []
+        
+        timestamps = []
+        for date_dir in sorted(historical_dir.glob("*")):
+            if not date_dir.is_dir():
+                continue
+            for meta_file in sorted(date_dir.glob("metadata_*.json")):
+                try:
+                    # Extract timestamp from filename (metadata_HHMMSS.json)
+                    time_part = meta_file.stem.split("_")[1]
+                    date_part = date_dir.name
+                    # Reconstruct full timestamp
+                    timestamp_str = f"{date_part}T{time_part[:2]}:{time_part[2:4]}:{time_part[4:6]}"
+                    timestamps.append(pd.Timestamp(timestamp_str).isoformat())
+                except Exception:
+                    continue
+        
+        return sorted(timestamps)
 
 

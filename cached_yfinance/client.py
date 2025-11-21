@@ -321,13 +321,29 @@ class CachedYFClient:
             # Check if we have any cached option data
             cached_expirations = list(self.cache.iter_cached_option_expirations(ticker))
             if cached_expirations:
-                return tuple(sorted(cached_expirations))
+                # Filter out expired dates (keep current and future dates)
+                from datetime import datetime
+                today = datetime.now().date()
+                valid_expirations = []
+                for exp_str in cached_expirations:
+                    try:
+                        exp_date = datetime.strptime(exp_str, '%Y-%m-%d').date()
+                        if exp_date >= today:  # Keep current and future dates (>= includes today)
+                            valid_expirations.append(exp_str)
+                    except ValueError:
+                        # Skip invalid date formats
+                        continue
+                
+                # If we have valid cached expirations, return them
+                if valid_expirations:
+                    return tuple(sorted(valid_expirations))
+                # If all cached expirations are expired, fall through to fetch fresh data
         
         # Fetch from yfinance
         yf_ticker = yf.Ticker(ticker)
         return yf_ticker.options
     
-    def get_option_chain(self, ticker: str, expiration: Optional[str] = None, use_cache: bool = True) -> OptionChain:
+    def get_option_chain(self, ticker: str, expiration: Optional[str] = None, use_cache: bool = True, timestamp: Optional[str] = None) -> OptionChain:
         """
         Get option chain data for a ticker and expiration date.
         
@@ -335,6 +351,7 @@ class CachedYFClient:
             ticker: Stock symbol
             expiration: Expiration date in YYYY-MM-DD format. If None, uses nearest expiration.
             use_cache: Whether to use cached data if available
+            timestamp: Optional timestamp for historical data storage/retrieval. If None, generates current timestamp for new data.
             
         Returns:
             OptionChain with calls, puts DataFrames and underlying data
@@ -350,9 +367,9 @@ class CachedYFClient:
         
         # Try to load from cache first
         if use_cache:
-            calls_key = OptionCacheKey.for_calls(ticker, expiration)
-            puts_key = OptionCacheKey.for_puts(ticker, expiration)
-            underlying_key = OptionCacheKey.for_underlying(ticker, expiration)
+            calls_key = OptionCacheKey.for_calls(ticker, expiration, timestamp)
+            puts_key = OptionCacheKey.for_puts(ticker, expiration, timestamp)
+            underlying_key = OptionCacheKey.for_underlying(ticker, expiration, timestamp)
             
             if (self.cache.has_option_chain(calls_key) and 
                 self.cache.has_option_chain(puts_key) and 
@@ -370,9 +387,13 @@ class CachedYFClient:
         try:
             options = yf_ticker.option_chain(expiration)
             
+            # Generate timestamp if not provided (for new data)
+            if timestamp is None:
+                timestamp = pd.Timestamp.now().isoformat()
+            
             # Store in cache
             self.cache.store_option_chain(
-                ticker, expiration, options.calls, options.puts, options.underlying
+                ticker, expiration, options.calls, options.puts, options.underlying, timestamp
             )
             
             return OptionChain(calls=options.calls, puts=options.puts, underlying=options.underlying)
