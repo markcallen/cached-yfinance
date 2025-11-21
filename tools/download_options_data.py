@@ -22,9 +22,10 @@ import argparse
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional
+from typing import Optional
 
 import pandas as pd
+
 
 # Add the parent directory to the path so we can import cached_yfinance
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -55,7 +56,7 @@ def download_option_chain(
         print(f"📁 Using custom cache directory: {cache_dir}")
     else:
         client = cyf.CachedYFClient()
-        print(f"📁 Using default cache directory: ~/.cache/yfinance")
+        print("📁 Using default cache directory: ~/.cache/yfinance")
 
     try:
         # Get option chain data (timestamps are automatically generated)
@@ -94,7 +95,7 @@ def download_option_chain(
                 print(f"   Total open interest: {active_calls['openInterest'].sum():,}")
 
                 # Show top 5 by volume
-                print(f"\n📋 Top 5 calls by volume:")
+                print("\n📋 Top 5 calls by volume:")
                 top_calls = active_calls.nlargest(5, "volume")[
                     [
                         "strike",
@@ -124,7 +125,7 @@ def download_option_chain(
                 print(f"   Total open interest: {active_puts['openInterest'].sum():,}")
 
                 # Show top 5 by volume
-                print(f"\n📋 Top 5 puts by volume:")
+                print("\n📋 Top 5 puts by volume:")
                 top_puts = active_puts.nlargest(5, "volume")[
                     [
                         "strike",
@@ -172,7 +173,7 @@ def download_option_chain(
             cache_path = client.cache.root / ticker.upper() / "options"
             if cache_path.exists():
                 cache_files = list(cache_path.rglob("*.parquet"))
-                print(f"\n💾 Cache info:")
+                print("\n💾 Cache info:")
                 print(f"   Location: {cache_path}")
                 print(f"   Files: {len(cache_files)} parquet files")
 
@@ -200,7 +201,7 @@ def download_all_expirations(ticker: str, cache_dir: str = None) -> None:
         print(f"📁 Using custom cache directory: {cache_dir}")
     else:
         client = cyf.CachedYFClient()
-        print(f"📁 Using default cache directory: ~/.cache/yfinance")
+        print("📁 Using default cache directory: ~/.cache/yfinance")
 
     try:
         # Get all available expiration dates directly from yfinance
@@ -247,13 +248,13 @@ def download_all_expirations(ticker: str, cache_dir: str = None) -> None:
                     total_puts += puts_count
                     successful_downloads += 1
                 else:
-                    print(f"   ⚠️  No data available")
+                    print("   ⚠️  No data available")
 
             except Exception as e:
                 print(f"   ❌ Error: {e}")
 
         # Summary
-        print(f"\n🎉 Download Summary:")
+        print("\n🎉 Download Summary:")
         print(f"   Successful expirations: {successful_downloads}/{len(expirations)}")
         print(f"   Total call contracts: {total_calls:,}")
         print(f"   Total put contracts: {total_puts:,}")
@@ -264,7 +265,7 @@ def download_all_expirations(ticker: str, cache_dir: str = None) -> None:
             cache_path = client.cache.root / ticker.upper() / "options"
             if cache_path.exists():
                 cache_files = list(cache_path.rglob("*.parquet"))
-                print(f"\n💾 Cache info:")
+                print("\n💾 Cache info:")
                 print(f"   Location: {cache_path}")
                 print(f"   Files: {len(cache_files)} parquet files")
 

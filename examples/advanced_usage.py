@@ -8,9 +8,8 @@ This example demonstrates more advanced features including:
 - Cache inspection and management
 """
 
-import os
 from pathlib import Path
-import cached_yfinance as cyf
+
 from cached_yfinance import CachedYFClient, FileSystemCache
 
 
@@ -56,8 +55,9 @@ def main():
 
     # Example 4: Cache key usage
     print("4. Working with cache keys...")
-    from cached_yfinance import CacheKey
     from datetime import date
+
+    from cached_yfinance import CacheKey
 
     # Create a cache key for a specific day
     key = CacheKey(symbol="AAPL", interval="1d", day=date.today())

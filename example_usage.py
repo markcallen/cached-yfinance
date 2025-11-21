@@ -9,6 +9,7 @@ the cached_yfinance library to work with options data.
 import sys
 from pathlib import Path
 
+
 # Add the current directory to the path
 sys.path.insert(0, str(Path(__file__).parent))
 
@@ -42,7 +43,7 @@ def example_options_workflow():
 
         # Step 3: Analyze the data
         if not option_chain.calls.empty:
-            print(f"\n🔍 Step 3: Sample analysis")
+            print("\n🔍 Step 3: Sample analysis")
             underlying_price = option_chain.underlying.get("regularMarketPrice", 0)
             print(f"Underlying price: ${underlying_price}")
 
@@ -57,7 +58,7 @@ def example_options_workflow():
 
             # Show top 5 calls by volume
             top_calls = option_chain.calls.nlargest(5, "volume")
-            print(f"\nTop 5 calls by volume:")
+            print("\nTop 5 calls by volume:")
             for _, call in top_calls.iterrows():
                 print(
                     f"  ${call['strike']}: Vol={call['volume']}, Price=${call['lastPrice']}"

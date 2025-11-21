@@ -3,10 +3,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from functools import lru_cache
-from typing import Dict, Iterable, List, Optional, Tuple, Union, NamedTuple
+from typing import Dict, Iterable, List, NamedTuple, Optional, Tuple, Union
 
 import pandas as pd
 import yfinance as yf
+
 
 try:  # pragma: no cover - optional dependency
     import pandas_market_calendars as mcal
@@ -448,7 +449,7 @@ class CachedYFClient:
                 calls=options.calls, puts=options.puts, underlying=options.underlying
             )
 
-        except Exception as e:
+        except Exception:
             # Return empty option chain if fetch fails
             return OptionChain(calls=pd.DataFrame(), puts=pd.DataFrame(), underlying={})
 

@@ -11,10 +11,10 @@ Usage:
 
 import sys
 from pathlib import Path
-from datetime import datetime, timedelta
 
-import pandas as pd
 import matplotlib.pyplot as plt
+import pandas as pd
+
 
 # Add the parent directory to the path so we can import cached_yfinance
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -199,7 +199,7 @@ def compare_current_vs_historical(ticker: str = "AAPL"):
         current_chain.calls["volume"].sum() + current_chain.puts["volume"].sum()
     )
 
-    print(f"📊 Current Data:")
+    print("📊 Current Data:")
     print(f"   Price: ${current_price:.2f}")
     print(f"   Total Volume: {current_volume:,}")
 

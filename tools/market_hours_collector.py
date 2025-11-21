@@ -32,12 +32,13 @@ import argparse
 import json
 import logging
 import sys
-from datetime import datetime, time
+from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 
 import pandas as pd
 import pytz
+
 
 # Add the parent directory to the path so we can import cached_yfinance
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -330,7 +331,7 @@ Cron example (every 15 minutes during market hours):
 
     # Summary
     logger.info("-" * 40)
-    logger.info(f"Collection Summary:")
+    logger.info("Collection Summary:")
     logger.info(f"  Successful tickers: {successful_tickers}/{total_tickers}")
     logger.info(f"  Total contracts collected: {total_contracts:,}")
     logger.info(f"  Timestamp: {pd.Timestamp.now().isoformat()}")

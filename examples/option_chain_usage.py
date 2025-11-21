@@ -6,9 +6,9 @@ This example demonstrates how to use cached-yfinance to fetch and cache option c
 Option chains include calls, puts, and underlying stock information for various expiration dates.
 """
 
+
+
 import cached_yfinance as cyf
-import pandas as pd
-from datetime import datetime
 
 
 def basic_option_chain_example():
@@ -105,7 +105,7 @@ def option_chain_with_custom_cache():
     print("\n=== Custom Cache Configuration ===")
 
     # Create custom cache
-    from cached_yfinance import FileSystemCache, CachedYFClient
+    from cached_yfinance import CachedYFClient, FileSystemCache
 
     cache = FileSystemCache("~/my_options_cache")
     client = CachedYFClient(cache)
@@ -113,7 +113,7 @@ def option_chain_with_custom_cache():
     # Get option chain using custom client
     option_chain = client.get_option_chain("TSLA")
 
-    print(f"TSLA option chain (custom cache):")
+    print("TSLA option chain (custom cache):")
     print(f"  Calls: {len(option_chain.calls)} contracts")
     print(f"  Puts: {len(option_chain.puts)} contracts")
 

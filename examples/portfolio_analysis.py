@@ -6,10 +6,11 @@ This example demonstrates how to use cached-yfinance for portfolio analysis,
 showing how caching can significantly speed up repeated analysis runs.
 """
 
-import cached_yfinance as cyf
-import pandas as pd
+
 import numpy as np
-from datetime import datetime, timedelta
+import pandas as pd
+
+import cached_yfinance as cyf
 
 
 def calculate_portfolio_metrics(returns):

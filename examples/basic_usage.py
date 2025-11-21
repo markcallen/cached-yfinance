@@ -6,8 +6,8 @@ This example demonstrates the simplest way to use cached-yfinance
 as a drop-in replacement for yfinance.download().
 """
 
+
 import cached_yfinance as cyf
-import pandas as pd
 
 
 def main():

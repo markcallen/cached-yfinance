@@ -21,6 +21,7 @@ import sys
 from datetime import datetime, timedelta
 from pathlib import Path
 
+
 # Add the parent directory to the path so we can import cached_yfinance
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -69,7 +70,7 @@ def download_data(
         print(f"📁 Using custom cache directory: {cache_dir}")
     else:
         client = cyf.CachedYFClient()
-        print(f"📁 Using default cache directory: ~/.cache/yfinance")
+        print("📁 Using default cache directory: ~/.cache/yfinance")
 
     # Calculate date range
     end_date = datetime.now()
@@ -105,7 +106,7 @@ def download_data(
         print(f"📈 Latest close: ${data['Close'].iloc[-1].item():.2f}")
 
         # Show recent data sample
-        print(f"\n📋 Last 5 data points:")
+        print("\n📋 Last 5 data points:")
         print(data.tail().round(2))
 
         # Cache statistics
@@ -113,7 +114,7 @@ def download_data(
             cache_path = client.cache.root / ticker.upper() / interval
             if cache_path.exists():
                 cache_files = list(cache_path.rglob("*.parquet"))
-                print(f"\n💾 Cache info:")
+                print("\n💾 Cache info:")
                 print(f"   Location: {cache_path}")
                 print(f"   Files: {len(cache_files)} parquet files")
 

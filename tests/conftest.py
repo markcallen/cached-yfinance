@@ -3,9 +3,9 @@
 import tempfile
 from pathlib import Path
 from typing import Generator
-import pytest
+
 import pandas as pd
-from datetime import date, datetime
+import pytest
 
 from cached_yfinance.cache import FileSystemCache
 

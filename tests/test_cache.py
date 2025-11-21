@@ -1,17 +1,18 @@
 """Tests for the cache module."""
 
 import json
-import pytest
-import pandas as pd
 from datetime import date, datetime
 from pathlib import Path
 
+import pandas as pd
+import pytest
+
 from cached_yfinance.cache import (
     CacheKey,
-    OptionCacheKey,
     FileSystemCache,
-    _sanitize_symbol,
+    OptionCacheKey,
     _ensure_datetime,
+    _sanitize_symbol,
 )
 
 

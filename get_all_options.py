@@ -15,11 +15,12 @@ Examples:
     python get_all_options.py MSFT --cache-dir /tmp   # Custom cache directory
 """
 
-import sys
 import argparse
+import sys
+from datetime import datetime
 from pathlib import Path
-from datetime import datetime, timedelta
-from typing import List, Tuple, Optional
+from typing import List, Tuple
+
 
 # Add the current directory to the path so we can import cached_yfinance
 sys.path.insert(0, str(Path(__file__).parent))
@@ -50,7 +51,7 @@ def get_upcoming_expirations(
 
         # If no expirations found or all are expired, try fresh fetch
         if not all_expirations:
-            print(f"   No cached expirations found, fetching fresh data...")
+            print("   No cached expirations found, fetching fresh data...")
             all_expirations = client.get_options_expirations(
                 ticker.upper(), use_cache=False
             )
@@ -107,13 +108,13 @@ def display_expirations(expirations: List[Tuple[str, int]], ticker: str) -> None
         elif days_until == 1:
             status = "Expires tomorrow"
         elif days_until <= 7:
-            status = f"This week"
+            status = "This week"
         elif days_until <= 30:
-            status = f"This month"
+            status = "This month"
         elif days_until <= 90:
-            status = f"Next 3 months"
+            status = "Next 3 months"
         else:
-            status = f"Long term"
+            status = "Long term"
 
         print(f"{i:<3} {exp_date:<12} {days_until:<12} {status}")
 
@@ -268,7 +269,7 @@ Examples:
         print(f"📁 Using custom cache directory: {args.cache_dir}")
     else:
         client = cyf.CachedYFClient()
-        print(f"📁 Using default cache directory: ~/.cache/yfinance")
+        print("📁 Using default cache directory: ~/.cache/yfinance")
 
     print(f"🎯 Target ticker: {ticker}")
     print(f"📅 Looking ahead: {args.days_ahead} days")

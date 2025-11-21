@@ -17,9 +17,9 @@ Usage:
     python iwm_analysis.py
 """
 
-import cached_yfinance as cyf
-import pandas as pd
 from datetime import datetime, timedelta
+
+import cached_yfinance as cyf
 
 
 def analyze_iwm_data():
@@ -49,7 +49,7 @@ def analyze_iwm_data():
         print(f"📅 Date range: {data.index[0]} to {data.index[-1]}")
 
         # Basic statistics
-        print(f"\n📊 Basic Statistics:")
+        print("\n📊 Basic Statistics:")
         print(f"   Current Price: ${data['Close'].iloc[-1]:.2f}")
         print(f"   60-day High:   ${data['High'].max():.2f}")
         print(f"   60-day Low:    ${data['Low'].min():.2f}")
@@ -57,7 +57,7 @@ def analyze_iwm_data():
         print(f"   Total Volume:   {data['Volume'].sum():,.0f}")
 
         # Daily aggregation for trend analysis
-        print(f"\n📈 Daily Trend Analysis:")
+        print("\n📈 Daily Trend Analysis:")
         daily_data = (
             data.resample("D")
             .agg(
@@ -82,13 +82,13 @@ def analyze_iwm_data():
         print(f"   Avg Daily Range: ${daily_data['Daily_Range'].mean():.2f}")
 
         # Recent performance
-        print(f"\n📋 Last 5 Trading Days:")
+        print("\n📋 Last 5 Trading Days:")
         recent_daily = daily_data.tail().round(2)
         recent_daily["Return_%"] = (recent_daily["Daily_Return"] * 100).round(2)
         print(recent_daily[["Open", "High", "Low", "Close", "Volume", "Return_%"]])
 
         # Intraday patterns
-        print(f"\n⏰ Intraday Patterns (Average by Hour):")
+        print("\n⏰ Intraday Patterns (Average by Hour):")
         data["Hour"] = data.index.hour
         hourly_avg = (
             data.groupby("Hour")
@@ -111,14 +111,14 @@ def analyze_iwm_data():
         if cache_path.exists():
             cache_files = list(cache_path.rglob("*.parquet"))
             total_size = sum(f.stat().st_size for f in cache_files)
-            print(f"\n💾 Cache Information:")
+            print("\n💾 Cache Information:")
             print(f"   Location: {cache_path}")
             print(f"   Files: {len(cache_files)} parquet files")
             print(f"   Size: {total_size / 1024 / 1024:.1f} MB")
 
-        print(f"\n🎯 Analysis Complete!")
+        print("\n🎯 Analysis Complete!")
         print(
-            f"💡 Tip: Run this script again to see how caching speeds up data retrieval!"
+            "💡 Tip: Run this script again to see how caching speeds up data retrieval!"
         )
 
     except Exception as e:

@@ -1,26 +1,26 @@
 """Tests for the client module."""
 
-import pytest
-import pandas as pd
 from datetime import date, datetime, timedelta
-from unittest.mock import Mock, patch, MagicMock
-from typing import List
+from unittest.mock import Mock, patch
 
+import pandas as pd
+import pytest
+
+from cached_yfinance.cache import CacheKey, FileSystemCache
 from cached_yfinance.client import (
     CachedYFClient,
     DownloadRequest,
     OptionChain,
-    download,
-    get_options_expirations,
-    get_option_chain,
-    _parse_timestamp,
-    _parse_period_to_timedelta,
-    _normalize_range,
-    _trading_days_inclusive,
-    _merge_dataframes,
     _contiguous_ranges,
+    _merge_dataframes,
+    _normalize_range,
+    _parse_period_to_timedelta,
+    _parse_timestamp,
+    _trading_days_inclusive,
+    download,
+    get_option_chain,
+    get_options_expirations,
 )
-from cached_yfinance.cache import FileSystemCache, CacheKey
 
 
 class TestDownloadRequest:
