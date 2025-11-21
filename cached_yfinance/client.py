@@ -277,9 +277,8 @@ class CachedYFClient:
             # Check if this is intraday data and if the date range exceeds Yahoo's limits
             is_intraday = any(interval.endswith(suffix) for suffix in ("m", "h"))
             if is_intraday:
-                # Yahoo Finance has a ~30-day limit for intraday data
-                days_requested = (end_day - start_day).days + 1
-                cutoff_date = pd.Timestamp.now().normalize() - pd.Timedelta(days=30)
+                # Yahoo Finance has a ~60-day limit for intraday data
+                cutoff_date = pd.Timestamp.now().normalize() - pd.Timedelta(days=60)
 
                 if fetch_start.normalize() < cutoff_date:
                     # Skip dates that are too old for intraday data
