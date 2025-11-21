@@ -13,7 +13,7 @@ import pandas as pd
 import cached_yfinance as cyf
 
 
-def calculate_portfolio_metrics(returns):
+def calculate_portfolio_metrics(returns: pd.Series) -> dict[str, float]:
     """Calculate basic portfolio metrics."""
     annual_return = returns.mean() * 252
     annual_volatility = returns.std() * np.sqrt(252)
@@ -26,7 +26,7 @@ def calculate_portfolio_metrics(returns):
     }
 
 
-def main():
+def main() -> None:
     """Demonstrate portfolio analysis with cached-yfinance."""
     print("=== Portfolio Analysis Example ===\n")
 
@@ -53,7 +53,13 @@ def main():
     for symbol in portfolio.keys():
         print(f"  Downloading {symbol}...")
         data = cyf.download(symbol, start=start_date, end=end_date)
-        portfolio_data[symbol] = data["Close"]
+        # Handle multi-level columns from yfinance
+        if isinstance(data.columns, pd.MultiIndex):
+            # Extract the Close price column
+            close_col = [col for col in data.columns if col[0] == "Close"][0]
+            portfolio_data[symbol] = data[close_col]
+        else:
+            portfolio_data[symbol] = data["Close"]
 
     # Combine into a single DataFrame
     prices_df = pd.DataFrame(portfolio_data)
@@ -110,10 +116,14 @@ def main():
         portfolio_weights, np.dot(returns_df.cov() * 252, portfolio_weights)
     )
 
-    for symbol in portfolio.keys():
+    # Calculate marginal contributions for all assets
+    cov_matrix = returns_df.cov() * 252
+    marginal_contribs = np.dot(cov_matrix, portfolio_weights)
+
+    for i, symbol in enumerate(portfolio.keys()):
         weight = portfolio_weights[symbol]
         # Marginal contribution to risk
-        marginal_contrib = np.dot(returns_df.cov() * 252, portfolio_weights)[symbol]
+        marginal_contrib = marginal_contribs[i]
         risk_contrib = weight * marginal_contrib / portfolio_variance
         print(
             f"  {symbol}: {risk_contrib:.2%} risk contribution (weight: {weight:.1%})"
@@ -140,7 +150,13 @@ def main():
         period_data = {}
         for symbol in portfolio.keys():
             data = cyf.download(symbol, start=start, end=end)
-            period_data[symbol] = data["Close"]
+            # Handle multi-level columns from yfinance
+            if isinstance(data.columns, pd.MultiIndex):
+                # Extract the Close price column
+                close_col = [col for col in data.columns if col[0] == "Close"][0]
+                period_data[symbol] = data[close_col]
+            else:
+                period_data[symbol] = data["Close"]
 
         # Quick analysis
         period_prices = pd.DataFrame(period_data)
@@ -149,7 +165,7 @@ def main():
         period_metrics = calculate_portfolio_metrics(period_portfolio_returns)
 
         elapsed = time.time() - start_time
-        total_time += elapsed
+        total_time += int(elapsed)
 
         print(
             f"    Return: {period_metrics['annual_return']:>8.2%}, "

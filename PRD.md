@@ -2,9 +2,9 @@
 
 ## Cached YFinance
 
-**Version:** 1.0  
-**Date:** November 20, 2025  
-**Author:** Product Team  
+**Version:** 1.0
+**Date:** November 20, 2025
+**Author:** Product Team
 **Status:** Active Development
 
 ---
@@ -242,7 +242,7 @@ for symbol in ["SPY", "QQQ", "IWM"]:
 - **Holiday Handling:** Don't cache data for market holidays
 - **Weekend Handling:** Proper handling of weekend dates
 - **Timezone Support:** Correct handling of market timezones
-- **Calendar Integration:** Optional pandas-market-calendars support
+- **Calendar Integration:** Built-in pandas-market-calendars support
 
 ---
 
@@ -278,12 +278,13 @@ for symbol in ["SPY", "QQQ", "IWM"]:
 #### 6.2.1 Required Dependencies
 
 - **pandas** (>=1.5.0): Data manipulation and DataFrame support
+- **pandas-market-calendars** (>=5.1.3): Market calendar support
 - **pyarrow** (>=17.0.0): Parquet file format support
 - **yfinance** (>=0.2.0): Core financial data provider
 
 #### 6.2.2 Optional Dependencies
 
-- **pandas-market-calendars** (>=4.0.0): Enhanced market calendar support
+- **matplotlib** (>=3.5.0): For visualization in examples
 
 #### 6.2.3 Development Dependencies
 
@@ -324,8 +325,8 @@ pip install cached-yfinance
 #### 7.1.2 Optional Features
 
 ```bash
-pip install cached-yfinance[market-calendars]  # Enhanced calendar support
-pip install cached-yfinance[dev]               # Development tools
+pip install cached-yfinance[examples]  # Examples with visualization
+pip install cached-yfinance[dev]       # Development tools
 ```
 
 ### 7.2 First-Time User Experience
@@ -637,6 +638,6 @@ Success will be measured through adoption metrics, performance benchmarks, and c
 
 ---
 
-**Document Status:** Active  
-**Next Review:** December 20, 2025  
+**Document Status:** Active
+**Next Review:** December 20, 2025
 **Stakeholders:** Development Team, Product Management, User Community

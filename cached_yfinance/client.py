@@ -126,9 +126,9 @@ def _trading_days_inclusive(start: pd.Timestamp, end: pd.Timestamp) -> Iterable[
     calendar = _nyse_calendar()
     if calendar is not None:
         schedule = calendar.schedule(start.date().isoformat(), end.date().isoformat())
-        if not schedule.empty:
-            # schedule index represents trading sessions
-            return [ts.date() for ts in schedule.index]
+        # schedule index represents trading sessions
+        # Return the trading days from the schedule (empty list if no trading days)
+        return [ts.date() for ts in schedule.index]
 
     # Fallback: weekdays only (Mon-Fri)
     current = start.date()
@@ -270,15 +270,28 @@ class CachedYFClient:
         downloads_kwargs: Dict[str, object],
     ) -> List[pd.DataFrame]:
         frames: List[pd.DataFrame] = []
-        for start_day, end_day in _contiguous_ranges(missing_dates):
+
+        # Filter out non-trading days to avoid YFPricesMissingError
+        # Only attempt to fetch data for actual trading days
+        trading_missing_dates = []
+        for missing_date in missing_dates:
+            # Check if this specific date is a trading day
+            start_ts = pd.Timestamp(missing_date)
+            end_ts = pd.Timestamp(missing_date)  # Same day, not next day
+            trading_days = list(_trading_days_inclusive(start_ts, end_ts))
+            # Check if the missing_date itself is in the trading days
+            if missing_date in trading_days:
+                trading_missing_dates.append(missing_date)
+
+        for start_day, end_day in _contiguous_ranges(trading_missing_dates):
             fetch_start = pd.Timestamp(start_day)
             fetch_end = pd.Timestamp(end_day + timedelta(days=1))
 
             # Check if this is intraday data and if the date range exceeds Yahoo's limits
             is_intraday = any(interval.endswith(suffix) for suffix in ("m", "h"))
             if is_intraday:
-                # Yahoo Finance has a ~60-day limit for intraday data
-                cutoff_date = pd.Timestamp.now().normalize() - pd.Timedelta(days=60)
+                # Yahoo Finance has a ~30-day limit for intraday data
+                cutoff_date = pd.Timestamp.now().normalize() - pd.Timedelta(days=30)
 
                 if fetch_start.normalize() < cutoff_date:
                     # Skip dates that are too old for intraday data
@@ -300,8 +313,15 @@ class CachedYFClient:
             except Exception as e:
                 # Log the error but continue with other date ranges
                 error_msg = str(e)
-                if "not available" in error_msg.lower() or "30 days" in error_msg:
-                    # This is expected for old intraday data, skip silently
+                if (
+                    "not available" in error_msg.lower()
+                    or "30 days" in error_msg
+                    or "YFPricesMissingError" in error_msg
+                    or "possibly delisted" in error_msg.lower()
+                    or "no price data found" in error_msg.lower()
+                ):
+                    # This is expected for old intraday data, non-trading days, or delisted stocks
+                    # Skip silently to avoid cluttering output
                     continue
                 else:
                     # Re-raise unexpected errors
@@ -453,7 +473,7 @@ class CachedYFClient:
             return OptionChain(calls=pd.DataFrame(), puts=pd.DataFrame(), underlying={})
 
 
-def download(*args, **kwargs) -> pd.DataFrame:
+def download(*args, **kwargs) -> pd.DataFrame:  # type: ignore[no-untyped-def]
     """
     Module-level convenience wrapper mirroring yfinance.download while leveraging the default cache.
     """

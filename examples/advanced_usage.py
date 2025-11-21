@@ -13,7 +13,7 @@ from pathlib import Path
 from cached_yfinance import CachedYFClient, FileSystemCache
 
 
-def main():
+def main() -> None:
     """Demonstrate advanced usage of cached-yfinance."""
     print("=== Advanced Usage Example ===\n")
 

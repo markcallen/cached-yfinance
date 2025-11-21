@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Iterable, Optional
 
 import pandas as pd
+from typeing import Any
 
 
 def _sanitize_symbol(symbol: str) -> str:
@@ -180,7 +181,9 @@ class FileSystemCache:
             ).exists()
         return False
 
-    def load_option_chain(self, key: OptionCacheKey) -> Optional[pd.DataFrame | dict]:
+    def load_option_chain(
+        self, key: OptionCacheKey
+    ) -> Optional[pd.DataFrame | dict[str, Any]]:
         """Load option chain data from cache."""
         if key.data_type in ("calls", "puts"):
             path = self._option_data_path(

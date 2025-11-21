@@ -1,0 +1,60 @@
+version: 2
+updates:
+  # Enable version updates for GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "yourusername"  # Replace with your GitHub username
+    assignees:
+      - "yourusername"  # Replace with your GitHub username
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+
+  # Enable version updates for Python dependencies managed by uv
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "10:00"
+    open-pull-requests-limit: 10
+    reviewers:
+      - "yourusername"  # Replace with your GitHub username
+    assignees:
+      - "yourusername"  # Replace with your GitHub username
+    commit-message:
+      prefix: "deps"
+      include: "scope"
+    # Group dependency updates to reduce PR noise
+    groups:
+      dev-dependencies:
+        patterns:
+          - "pytest*"
+          - "black"
+          - "mypy"
+          - "ruff"
+          - "pandas-stubs"
+        update-types:
+          - "minor"
+          - "patch"
+      production-dependencies:
+        patterns:
+          - "pandas*"
+          - "yfinance"
+          - "pyarrow"
+        update-types:
+          - "patch"
+    # Allow both direct and indirect dependency updates
+    allow:
+      - dependency-type: "direct"
+      - dependency-type: "indirect"
+    # Ignore specific packages if needed (uncomment and modify as needed)
+    # ignore:
+    #   - dependency-name: "pandas"
+    #     versions: ["2.x"]

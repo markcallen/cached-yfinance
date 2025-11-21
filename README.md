@@ -10,7 +10,7 @@ A high-performance caching wrapper around [yfinance](https://github.com/ranarous
 - **Significant performance improvements** for repeated requests (up to 45x faster!)
 - **Flexible cache configuration** with custom storage locations
 - **Support for all yfinance intervals** (1m, 5m, 1h, 1d, etc.)
-- **Market calendar awareness** (optional with pandas-market-calendars)
+- **Market calendar awareness** with pandas-market-calendars
 - **Thread-safe operations**
 - **Automatic cache invalidation** for stale data
 
@@ -134,14 +134,14 @@ pip install cached_yfinance-0.1.0.tar.gz
 
 ### Optional Dependencies
 
-#### Market Calendar Support
+#### Examples Dependencies
 
-For enhanced market calendar functionality:
+For running the examples with visualization support:
 
 ```bash
-pip install pandas-market-calendars
+pip install cached-yfinance[examples]
 # or
-uv add cached-yfinance[market-calendars]
+uv add cached-yfinance[examples]
 ```
 
 #### Development Dependencies

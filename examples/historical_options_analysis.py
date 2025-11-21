@@ -11,6 +11,7 @@ Usage:
 
 import sys
 from pathlib import Path
+from typing import Optional
 
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -22,7 +23,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 import cached_yfinance as cyf
 
 
-def analyze_historical_options(ticker: str = "AAPL", expiration: str = None):
+def analyze_historical_options(
+    ticker: str = "AAPL", expiration: Optional[str] = None
+) -> None:
     """
     Analyze historical options data for a ticker.
 
@@ -181,7 +184,7 @@ def analyze_historical_options(ticker: str = "AAPL", expiration: str = None):
         print(f"⚠️  Chart generation failed: {e}")
 
 
-def compare_current_vs_historical(ticker: str = "AAPL"):
+def compare_current_vs_historical(ticker: str = "AAPL") -> None:
     """Compare current options data with historical average."""
     print(f"\n🔄 Comparing current vs historical data for {ticker}")
     print("=" * 50)

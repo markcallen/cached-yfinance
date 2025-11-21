@@ -7,11 +7,10 @@ Option chains include calls, puts, and underlying stock information for various 
 """
 
 
-
 import cached_yfinance as cyf
 
 
-def basic_option_chain_example():
+def basic_option_chain_example() -> None:
     """Basic option chain usage - fetch nearest expiration."""
     print("=== Basic Option Chain Example ===")
 
@@ -41,7 +40,7 @@ def basic_option_chain_example():
         )
 
 
-def expiration_dates_example():
+def expiration_dates_example() -> None:
     """Get available expiration dates for a ticker."""
     print("\n=== Available Expiration Dates ===")
 
@@ -59,7 +58,7 @@ def expiration_dates_example():
         print(f"  Puts: {len(option_chain.puts)} contracts")
 
 
-def advanced_option_analysis():
+def advanced_option_analysis() -> None:
     """Advanced option chain analysis."""
     print("\n=== Advanced Option Analysis ===")
 
@@ -100,7 +99,7 @@ def advanced_option_analysis():
         print(f"  Implied Volatility: {atm_put['impliedVolatility']:.4f}")
 
 
-def option_chain_with_custom_cache():
+def option_chain_with_custom_cache() -> None:
     """Use option chains with custom cache configuration."""
     print("\n=== Custom Cache Configuration ===")
 
@@ -122,7 +121,7 @@ def option_chain_with_custom_cache():
     print(f"  Cached expirations: {cached_expirations}")
 
 
-def option_greeks_analysis():
+def option_greeks_analysis() -> None:
     """Analyze option Greeks and other metrics."""
     print("\n=== Option Greeks Analysis ===")
 
@@ -157,7 +156,7 @@ def option_greeks_analysis():
     )
 
 
-def caching_performance_demo():
+def caching_performance_demo() -> None:
     """Demonstrate caching performance benefits."""
     print("\n=== Caching Performance Demo ===")
 

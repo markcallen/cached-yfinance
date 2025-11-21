@@ -10,7 +10,7 @@ as a drop-in replacement for yfinance.download().
 import cached_yfinance as cyf
 
 
-def main():
+def main() -> None:
     """Demonstrate basic usage of cached-yfinance."""
     print("=== Basic Usage Example ===\n")
 

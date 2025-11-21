@@ -19,10 +19,12 @@ Usage:
 
 from datetime import datetime, timedelta
 
+import pandas as pd
+
 import cached_yfinance as cyf
 
 
-def analyze_iwm_data():
+def analyze_iwm_data() -> bool:
     """Download and analyze IWM 1-minute data."""
     print("🏦 IWM (iShares Russell 2000 ETF) Analysis")
     print("=" * 50)
@@ -43,10 +45,14 @@ def analyze_iwm_data():
 
         if data.empty:
             print("❌ No data found for IWM")
-            return
+            return False
 
         print(f"✅ Downloaded {len(data):,} data points")
         print(f"📅 Date range: {data.index[0]} to {data.index[-1]}")
+
+        # Flatten MultiIndex columns if present
+        if isinstance(data.columns, pd.MultiIndex):
+            data.columns = data.columns.droplevel(1)
 
         # Basic statistics
         print("\n📊 Basic Statistics:")
@@ -89,7 +95,7 @@ def analyze_iwm_data():
 
         # Intraday patterns
         print("\n⏰ Intraday Patterns (Average by Hour):")
-        data["Hour"] = data.index.hour
+        data["Hour"] = data.index.to_series().dt.hour
         hourly_avg = (
             data.groupby("Hour")
             .agg({"Volume": "mean", "High": "mean", "Low": "mean", "Close": "mean"})
@@ -128,7 +134,7 @@ def analyze_iwm_data():
     return True
 
 
-def main():
+def main() -> None:
     """Main entry point."""
     print("=== Advanced IWM ETF Analysis Example ===\n")
     print("This example demonstrates advanced cached-yfinance usage with:")
