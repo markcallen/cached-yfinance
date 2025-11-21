@@ -4,10 +4,9 @@ import json
 from dataclasses import dataclass
 from datetime import date, datetime
 from pathlib import Path
-from typing import Iterable, Optional
+from typing import Any, Iterable, Optional
 
 import pandas as pd
-from typeing import Any
 
 
 def _sanitize_symbol(symbol: str) -> str:
