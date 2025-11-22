@@ -424,8 +424,8 @@ uv run pytest tests/test_cache.py::TestCacheKey::test_cache_key_creation -v
 ### Code Formatting
 
 ```bash
-black cached_yfinance/
-ruff check --fix cached_yfinance/
+uv run black cached_yfinance/
+uv run ruff check --fix cached_yfinance/
 ```
 
 ## 📄 License
