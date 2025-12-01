@@ -192,6 +192,31 @@ class CachedYFClient:
         tickers = tickers.strip()
         req = DownloadRequest(tickers, interval, None, None, kwargs)
         start_ts, end_ts = _normalize_range(start, end, period, interval)
+
+        # Validate and adjust date ranges for intraday data
+        # Yahoo Finance limits intraday data to the last 30 days and cannot be in the future
+        is_intraday = any(interval.endswith(suffix) for suffix in ("m", "h"))
+        if is_intraday and start_ts is not None and end_ts is not None:
+            now = pd.Timestamp.now()
+            now_normalized = now.normalize()
+            cutoff_date = now_normalized - pd.Timedelta(days=30)
+
+            # Cap end date to current time if it's in the future
+            if end_ts > now:
+                end_ts = now
+
+            # Cap start date to current date if it's in the future
+            if start_ts.normalize() > now_normalized:
+                start_ts = now_normalized
+
+            # Adjust start date if it's too old (more than 30 days ago)
+            if start_ts.normalize() < cutoff_date:
+                start_ts = cutoff_date
+
+            # Final validation: if range is invalid, return empty DataFrame
+            if start_ts >= end_ts:
+                return pd.DataFrame()
+
         req.start = start_ts
         req.end = end_ts
 
@@ -290,11 +315,38 @@ class CachedYFClient:
             # Check if this is intraday data and if the date range exceeds Yahoo's limits
             is_intraday = any(interval.endswith(suffix) for suffix in ("m", "h"))
             if is_intraday:
-                # Yahoo Finance has a ~30-day limit for intraday data
-                cutoff_date = pd.Timestamp.now().normalize() - pd.Timedelta(days=30)
+                now = pd.Timestamp.now()
+                now_normalized = now.normalize()
 
-                if fetch_start.normalize() < cutoff_date:
-                    # Skip dates that are too old for intraday data
+                # Yahoo Finance has a ~30-day limit for intraday data
+                # Data must be within the last 30 days from now
+                cutoff_date = now_normalized - pd.Timedelta(days=30)
+
+                fetch_start_normalized = fetch_start.normalize()
+                fetch_end_normalized = fetch_end.normalize()
+
+                # Skip if start date is in the future
+                if fetch_start_normalized > now_normalized:
+                    continue
+
+                # Skip if start date is too old (more than 30 days ago)
+                if fetch_start_normalized < cutoff_date:
+                    # Try to adjust: if end date is within range, adjust start to cutoff
+                    if (
+                        fetch_end_normalized <= now_normalized
+                        and fetch_end_normalized > cutoff_date
+                    ):
+                        fetch_start = cutoff_date
+                    else:
+                        # Range is entirely outside valid window, skip
+                        continue
+
+                # Adjust end date if it's in the future (cap to now)
+                if fetch_end_normalized > now_normalized:
+                    fetch_end = now
+
+                # Final check: ensure the adjusted range is valid
+                if fetch_start >= fetch_end:
                     continue
 
             try:

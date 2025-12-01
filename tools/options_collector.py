@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Market Hours Options Data Collector
+Options Data Collector
 
 This script is designed to run via cron every 15 minutes during market hours
 (9:30 AM - 4:00 PM EST, Monday-Friday) to collect historical options data.
@@ -12,10 +12,10 @@ The script automatically:
 - Skips execution on weekends and holidays
 
 Usage:
-    python market_hours_collector.py [--config CONFIG_FILE] [--cache-dir CACHE_DIR]
+    python options_collector.py [--config CONFIG_FILE] [--cache-dir CACHE_DIR]
 
 Cron example (every 15 minutes during market hours):
-    */15 9-16 * * 1-5 /usr/bin/python3 /path/to/market_hours_collector.py --config /path/to/config.json
+    */15 9-16 * * 1-5 /usr/bin/python3 /path/to/options_collector.py --config /path/to/config.json
 
 Configuration file format (JSON):
 {
@@ -61,7 +61,7 @@ DEFAULT_CONFIG = {
 
 def setup_logging(log_file: Optional[str] = None) -> logging.Logger:
     """Setup logging configuration."""
-    logger = logging.getLogger("market_collector")
+    logger = logging.getLogger("options_collector")
     logger.setLevel(logging.INFO)
 
     # Remove existing handlers
@@ -224,7 +224,7 @@ def collect_options_data(
 
 
 def main():
-    """Main entry point for the market hours collector."""
+    """Main entry point for the options collector."""
     parser = argparse.ArgumentParser(
         description="Collect options data during market hours",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -241,7 +241,7 @@ Configuration file format (JSON):
 }
 
 Cron example (every 15 minutes during market hours):
-*/15 9-16 * * 1-5 /usr/bin/python3 /path/to/market_hours_collector.py --config /path/to/config.json
+*/15 9-16 * * 1-5 /usr/bin/python3 /path/to/options_collector.py --config /path/to/config.json
         """,
     )
 
@@ -283,7 +283,7 @@ Cron example (every 15 minutes during market hours):
 
     # Log startup
     logger.info("=" * 60)
-    logger.info("Market Hours Options Collector Starting")
+    logger.info("Options Collector Starting")
     logger.info(f"Tickers: {config['tickers']}")
     logger.info(f"Cache directory: {config['cache_dir'] or '~/.cache/yfinance'}")
     logger.info(f"Max expirations per ticker: {config['max_expirations']}")
@@ -335,7 +335,7 @@ Cron example (every 15 minutes during market hours):
     logger.info(f"  Successful tickers: {successful_tickers}/{total_tickers}")
     logger.info(f"  Total contracts collected: {total_contracts:,}")
     logger.info(f"  Timestamp: {pd.Timestamp.now().isoformat()}")
-    logger.info("Market Hours Options Collector Complete")
+    logger.info("Options Collector Complete")
     logger.info("=" * 60)
 
 

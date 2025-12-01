@@ -467,6 +467,355 @@ class TestCachedYFClient:
         assert cache.has(key)
 
 
+class TestCachedYFClientIntradayDateValidation:
+    """Test date validation for intraday data (30-day limit)."""
+
+    @patch("cached_yfinance.client.pd.Timestamp.now")
+    @patch("yfinance.download")
+    def test_download_intraday_future_start_date(
+        self,
+        mock_download: Mock,
+        mock_now: Mock,
+        cache: FileSystemCache,
+        sample_dataframe: pd.DataFrame,
+    ) -> None:
+        """Test download adjusts start date if it's in the future."""
+        # Set "now" to a fixed time
+        fixed_now = pd.Timestamp("2024-01-15 12:00:00")
+        mock_now.return_value = fixed_now
+
+        # Create sample data for today
+        today_dates = pd.date_range("2024-01-15 09:30", periods=10, freq="1min")
+        today_data = pd.DataFrame({"Close": [100.0] * 10}, index=today_dates)
+
+        mock_download.return_value = today_data
+        client = CachedYFClient(cache)
+
+        # Request data with future start date
+        future_start = "2024-01-20"  # 5 days in the future
+        result = client.download(
+            "AAPL", start=future_start, end="2024-01-20", interval="1m"
+        )
+
+        # Should adjust start to today and return empty (no valid range)
+        assert result.empty
+        # Should not call yfinance since range is invalid after adjustment
+        mock_download.assert_not_called()
+
+    @patch("cached_yfinance.client.pd.Timestamp.now")
+    @patch("yfinance.download")
+    def test_download_intraday_future_end_date(
+        self,
+        mock_download: Mock,
+        mock_now: Mock,
+        cache: FileSystemCache,
+    ) -> None:
+        """Test download adjusts end date if it's in the future."""
+        # Set "now" to a fixed time
+        fixed_now = pd.Timestamp("2024-01-15 12:00:00")
+        mock_now.return_value = fixed_now
+
+        # Create sample data for today
+        today_dates = pd.date_range("2024-01-15 09:30", periods=10, freq="1min")
+        today_data = pd.DataFrame({"Close": [100.0] * 10}, index=today_dates)
+
+        mock_download.return_value = today_data
+        client = CachedYFClient(cache)
+
+        # Request data with future end date but valid start
+        valid_start = (fixed_now - timedelta(days=5)).strftime("%Y-%m-%d")
+        future_end = "2024-01-20"  # 5 days in the future
+
+        client.download("AAPL", start=valid_start, end=future_end, interval="1m")
+
+        # Should adjust end to now and attempt download
+        mock_download.assert_called()
+        # Verify the end date was capped to now
+        call_args = mock_download.call_args
+        assert call_args[1]["end"] <= fixed_now
+
+    @patch("cached_yfinance.client.pd.Timestamp.now")
+    @patch("yfinance.download")
+    def test_download_intraday_old_start_date(
+        self,
+        mock_download: Mock,
+        mock_now: Mock,
+        cache: FileSystemCache,
+    ) -> None:
+        """Test download adjusts start date if it's more than 30 days ago."""
+        # Set "now" to a fixed time
+        fixed_now = pd.Timestamp("2024-01-15 12:00:00")
+        mock_now.return_value = fixed_now
+
+        # Create sample data for recent dates
+        recent_dates = pd.date_range("2024-01-10 09:30", periods=10, freq="1min")
+        recent_data = pd.DataFrame({"Close": [100.0] * 10}, index=recent_dates)
+
+        mock_download.return_value = recent_data
+        client = CachedYFClient(cache)
+
+        # Request data with start date more than 30 days ago
+        old_start = (fixed_now - timedelta(days=35)).strftime("%Y-%m-%d")
+        valid_end = (fixed_now - timedelta(days=5)).strftime("%Y-%m-%d")
+
+        client.download("AAPL", start=old_start, end=valid_end, interval="1m")
+
+        # Should adjust start to 30 days ago and attempt download
+        mock_download.assert_called()
+        call_args = mock_download.call_args
+        # Start should be at least 30 days before now
+        start_arg = call_args[1]["start"]
+        cutoff_date = fixed_now.normalize() - pd.Timedelta(days=30)
+        assert start_arg.normalize() >= cutoff_date
+
+    @patch("cached_yfinance.client.pd.Timestamp.now")
+    def test_download_intraday_range_outside_30_days_returns_empty(
+        self, mock_now: Mock, cache: FileSystemCache
+    ) -> None:
+        """Test download returns empty DataFrame if entire range is outside 30 days."""
+        # Set "now" to a fixed time
+        fixed_now = pd.Timestamp("2024-01-15 12:00:00")
+        mock_now.return_value = fixed_now
+
+        client = CachedYFClient(cache)
+
+        # Request data entirely outside 30-day window
+        old_start = (fixed_now - timedelta(days=35)).strftime("%Y-%m-%d")
+        old_end = (fixed_now - timedelta(days=32)).strftime("%Y-%m-%d")
+
+        result = client.download("AAPL", start=old_start, end=old_end, interval="1m")
+
+        # Should return empty DataFrame without calling yfinance
+        assert result.empty
+
+    @patch("cached_yfinance.client.pd.Timestamp.now")
+    @patch("yfinance.download")
+    def test_download_intraday_valid_range_within_30_days(
+        self,
+        mock_download: Mock,
+        mock_now: Mock,
+        cache: FileSystemCache,
+    ) -> None:
+        """Test download works correctly for valid range within 30 days."""
+        # Set "now" to a fixed time
+        fixed_now = pd.Timestamp("2024-01-15 12:00:00")
+        mock_now.return_value = fixed_now
+
+        # Create sample data
+        dates = pd.date_range("2024-01-10 09:30", periods=10, freq="1min")
+        sample_data = pd.DataFrame({"Close": [100.0] * 10}, index=dates)
+
+        mock_download.return_value = sample_data
+        client = CachedYFClient(cache)
+
+        # Request data within valid 30-day window
+        valid_start = (fixed_now - timedelta(days=5)).strftime("%Y-%m-%d")
+        valid_end = (fixed_now - timedelta(days=1)).strftime("%Y-%m-%d")
+
+        result = client.download(
+            "AAPL", start=valid_start, end=valid_end, interval="1m"
+        )
+
+        # Should call yfinance and return data
+        mock_download.assert_called()
+        assert not result.empty
+
+    @patch("cached_yfinance.client.pd.Timestamp.now")
+    def test_download_intraday_edge_case_exactly_30_days(
+        self, mock_now: Mock, cache: FileSystemCache
+    ) -> None:
+        """Test download handles edge case of exactly 30 days ago."""
+        # Set "now" to a fixed time
+        fixed_now = pd.Timestamp("2024-01-15 12:00:00")
+        mock_now.return_value = fixed_now
+
+        client = CachedYFClient(cache)
+
+        # Request data starting exactly 30 days ago
+        exactly_30_days_ago = (fixed_now - timedelta(days=30)).strftime("%Y-%m-%d")
+        today = fixed_now.strftime("%Y-%m-%d")
+
+        with patch("yfinance.download") as mock_download:
+            dates = pd.date_range(
+                exactly_30_days_ago + " 09:30", periods=10, freq="1min"
+            )
+            sample_data = pd.DataFrame({"Close": [100.0] * 10}, index=dates)
+            mock_download.return_value = sample_data
+
+            client.download("AAPL", start=exactly_30_days_ago, end=today, interval="1m")
+
+            # Should attempt download (30 days is the limit, so it's valid)
+            mock_download.assert_called()
+
+    @patch("cached_yfinance.client.pd.Timestamp.now")
+    def test_download_intraday_edge_case_31_days_ago(
+        self, mock_now: Mock, cache: FileSystemCache
+    ) -> None:
+        """Test download adjusts start date if it's 31 days ago."""
+        # Set "now" to a fixed time
+        fixed_now = pd.Timestamp("2024-01-15 12:00:00")
+        mock_now.return_value = fixed_now
+
+        client = CachedYFClient(cache)
+
+        # Request data starting 31 days ago (should be adjusted to 30 days)
+        too_old_start = (fixed_now - timedelta(days=31)).strftime("%Y-%m-%d")
+        today = fixed_now.strftime("%Y-%m-%d")
+
+        with patch("yfinance.download") as mock_download:
+            # Create data starting from 30 days ago
+            cutoff_date = fixed_now.normalize() - pd.Timedelta(days=30)
+            dates = pd.date_range(cutoff_date, periods=10, freq="1min")
+            sample_data = pd.DataFrame({"Close": [100.0] * 10}, index=dates)
+            mock_download.return_value = sample_data
+
+            client.download("AAPL", start=too_old_start, end=today, interval="1m")
+
+            # Should adjust start to 30 days ago and attempt download
+            mock_download.assert_called()
+            call_args = mock_download.call_args
+            start_arg = call_args[1]["start"]
+            cutoff_date_normalized = cutoff_date.normalize()
+            assert start_arg.normalize() >= cutoff_date_normalized
+
+    @patch("cached_yfinance.client.pd.Timestamp.now")
+    def test_download_daily_interval_not_affected(
+        self, mock_now: Mock, cache: FileSystemCache
+    ) -> None:
+        """Test that daily interval is not affected by 30-day validation."""
+        # Set "now" to a fixed time
+        fixed_now = pd.Timestamp("2024-01-15 12:00:00")
+        mock_now.return_value = fixed_now
+
+        client = CachedYFClient(cache)
+
+        # Request daily data with old dates (should work fine)
+        old_start = (fixed_now - timedelta(days=100)).strftime("%Y-%m-%d")
+        old_end = (fixed_now - timedelta(days=50)).strftime("%Y-%m-%d")
+
+        with patch("yfinance.download") as mock_download:
+            dates = pd.date_range(old_start, old_end, freq="D")
+            sample_data = pd.DataFrame({"Close": [100.0] * len(dates)}, index=dates)
+            mock_download.return_value = sample_data
+
+            client.download("AAPL", start=old_start, end=old_end, interval="1d")
+
+            # Should call yfinance without date adjustments for daily data
+            mock_download.assert_called()
+            call_args = mock_download.call_args
+            # For daily intervals, dates more than 30 days ago should still be valid
+            # The key test: start date should be old (more than 30 days before fixed_now)
+            # This proves the 30-day validation is NOT applied to daily intervals
+            start_arg = call_args[1]["start"]
+            start_ts = pd.Timestamp(start_arg).normalize()
+            cutoff_date = fixed_now.normalize() - pd.Timedelta(days=30)
+            # Start date should be older than 30 days (proving validation wasn't applied)
+            assert (
+                start_ts < cutoff_date
+            ), "Daily interval should allow dates older than 30 days"
+
+    @patch("cached_yfinance.client.pd.Timestamp.now")
+    def test_download_intraday_both_future_dates(
+        self, mock_now: Mock, cache: FileSystemCache
+    ) -> None:
+        """Test download handles both start and end dates in the future."""
+        # Set "now" to a fixed time
+        fixed_now = pd.Timestamp("2024-01-15 12:00:00")
+        mock_now.return_value = fixed_now
+
+        client = CachedYFClient(cache)
+
+        # Request data with both dates in the future
+        future_start = "2024-01-20"
+        future_end = "2024-01-25"
+
+        result = client.download(
+            "AAPL", start=future_start, end=future_end, interval="1m"
+        )
+
+        # Should return empty DataFrame (no valid range after adjustment)
+        assert result.empty
+
+    @patch("cached_yfinance.client.pd.Timestamp.now")
+    @patch("yfinance.download")
+    def test_fetch_and_store_missing_skips_future_dates(
+        self,
+        mock_download: Mock,
+        mock_now: Mock,
+        cache: FileSystemCache,
+    ) -> None:
+        """Test _fetch_and_store_missing skips dates in the future."""
+        # Set "now" to a fixed time
+        fixed_now = pd.Timestamp("2024-01-15 12:00:00")
+        mock_now.return_value = fixed_now
+
+        client = CachedYFClient(cache)
+
+        # Create missing dates including future dates
+        from datetime import date as date_type
+
+        # Use dates relative to fixed_now
+        past_date = date_type(2024, 1, 10)  # 5 days ago from fixed_now
+        future_date = date_type(2024, 1, 20)  # 5 days in future from fixed_now
+
+        missing_dates = [past_date, future_date]
+
+        # Mock yfinance to return data
+        dates = pd.date_range("2024-01-10 09:30", periods=10, freq="1min")
+        sample_data = pd.DataFrame({"Close": [100.0] * 10}, index=dates)
+        mock_download.return_value = sample_data
+
+        # Call _fetch_and_store_missing directly
+        client._fetch_and_store_missing("AAPL", "1m", missing_dates, {})
+
+        # Should skip future date and only fetch past date
+        # Future dates should be skipped, so we should only get data for past_date
+        mock_download.assert_called()
+        # Verify the call doesn't include future dates
+        call_args = mock_download.call_args
+        end_arg = call_args[1]["end"]
+        assert pd.Timestamp(end_arg) <= fixed_now
+
+    @patch("cached_yfinance.client.pd.Timestamp.now")
+    @patch("yfinance.download")
+    def test_fetch_and_store_missing_skips_old_dates(
+        self,
+        mock_download: Mock,
+        mock_now: Mock,
+        cache: FileSystemCache,
+    ) -> None:
+        """Test _fetch_and_store_missing skips dates more than 30 days ago."""
+        # Set "now" to a fixed time
+        fixed_now = pd.Timestamp("2024-01-15 12:00:00")
+        mock_now.return_value = fixed_now
+
+        client = CachedYFClient(cache)
+
+        # Create missing dates including very old dates
+        from datetime import date as date_type
+
+        old_date = date_type(2023, 11, 1)  # More than 30 days ago
+        recent_date = date_type(2024, 1, 10)  # 5 days ago
+
+        missing_dates = [old_date, recent_date]
+
+        # Mock yfinance to return data
+        dates = pd.date_range("2024-01-10 09:30", periods=10, freq="1min")
+        sample_data = pd.DataFrame({"Close": [100.0] * 10}, index=dates)
+        mock_download.return_value = sample_data
+
+        # Call _fetch_and_store_missing directly
+        client._fetch_and_store_missing("AAPL", "1m", missing_dates, {})
+
+        # Should skip old date and only fetch recent date
+        mock_download.assert_called()
+        # Verify the call doesn't include dates older than 30 days
+        call_args = mock_download.call_args
+        start_arg = call_args[1]["start"]
+        cutoff_date = fixed_now.normalize() - pd.Timedelta(days=30)
+        assert pd.Timestamp(start_arg).normalize() >= cutoff_date
+
+
 class TestCachedYFClientOptions:
     """Test CachedYFClient option chain functionality."""
 

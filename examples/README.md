@@ -170,7 +170,7 @@ python historical_options_analysis.py
 - ⏰ Timestamp-based data retrieval
 - 🔍 Current vs historical data comparison
 
-**Note:** This example works best when you have historical data collected. Run the `market_hours_collector.py` tool first to automatically collect timestamped options data throughout trading hours.
+**Note:** This example works best when you have historical data collected. Run the `options_collector.py` tool first to automatically collect timestamped options data throughout trading hours.
 
 ## Installing Dependencies
 
