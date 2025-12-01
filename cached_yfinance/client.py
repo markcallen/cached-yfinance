@@ -201,9 +201,10 @@ class CachedYFClient:
             now_normalized = now.normalize()
             cutoff_date = now_normalized - pd.Timedelta(days=30)
 
-            # Cap end date to current time if it's in the future
-            if end_ts > now:
-                end_ts = now
+            # Cap end date to current date if it's in the future
+            # Normalize for consistency with start_ts handling and day-based caching
+            if end_ts.normalize() > now_normalized:
+                end_ts = now_normalized
 
             # Cap start date to current date if it's in the future
             if start_ts.normalize() > now_normalized:
@@ -341,9 +342,10 @@ class CachedYFClient:
                         # Range is entirely outside valid window, skip
                         continue
 
-                # Adjust end date if it's in the future (cap to now)
+                # Adjust end date if it's in the future (cap to normalized now)
+                # Normalize for consistency with start date handling and day-based caching
                 if fetch_end_normalized > now_normalized:
-                    fetch_end = now
+                    fetch_end = now_normalized
 
                 # Final check: ensure the adjusted range is valid
                 if fetch_start >= fetch_end:
