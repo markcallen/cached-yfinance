@@ -400,23 +400,27 @@ class TestCachedYFClient:
         assert result.empty
 
     @patch("yfinance.download")
+    @patch("cached_yfinance.client.pd.Timestamp.now")
     def test_download_intraday_unexpected_error(
-        self, mock_download: Mock, cache: FileSystemCache
+        self,
+        mock_now: Mock,
+        mock_download: Mock,
+        cache: FileSystemCache,
     ) -> None:
         """Test download re-raises unexpected errors for intraday data."""
         # Mock yfinance to raise an unexpected error
         mock_download.side_effect = Exception("Unexpected error")
 
+        # Use a very recent date to avoid the 30-day cutoff logic
+        fixed_now = pd.Timestamp("2023-12-01 12:00:00")
+        mock_now.return_value = fixed_now
+
         client = CachedYFClient(cache)
 
-        # Use a very recent date to avoid the 30-day cutoff logic
-        with patch("pandas.Timestamp.now") as mock_now:
-            mock_now.return_value = pd.Timestamp("2023-12-01")
-
-            with pytest.raises(Exception, match="Unexpected error"):
-                client.download(
-                    "AAPL", start="2023-11-15", end="2023-11-15", interval="5m"
-                )
+        # Use a date range that's within 30 days and includes trading days
+        # 2023-11-15 is a Wednesday, 2023-11-16 is a Thursday
+        with pytest.raises(Exception, match="Unexpected error"):
+            client.download("AAPL", start="2023-11-15", end="2023-11-16", interval="5m")
 
     def test_persist_empty_dataframe(self, cache: FileSystemCache) -> None:
         """Test _persist with empty DataFrame."""
