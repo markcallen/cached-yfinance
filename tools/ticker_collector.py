@@ -142,16 +142,17 @@ def collect_1m_data(
     try:
         # Validate days for 1-minute data (Yahoo Finance limits to <30 days)
         # Yahoo Finance requires start date to be strictly less than 30 days ago
-        if interval == "1m" and days >= 30:
+        adjusted_days = days
+        if interval == "1m" and adjusted_days >= 30:
             logger.warning(
                 f"{ticker}: Yahoo Finance limits 1-minute data to less than 30 days. "
-                f"Adjusting from {days} to 29 days."
+                f"Adjusting from {adjusted_days} to 29 days."
             )
-            days = 29
+            adjusted_days = 29
 
         # Calculate date range
         end_date = datetime.now()
-        start_date = end_date - timedelta(days=days)
+        start_date = end_date - timedelta(days=adjusted_days)
 
         logger.info(
             f"{ticker}: Downloading {interval} data from {start_date.strftime('%Y-%m-%d')} "

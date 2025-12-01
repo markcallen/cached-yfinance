@@ -209,10 +209,10 @@ To automatically collect ticker data daily (typically after market close) using 
 
    ```bash
    # Collect ticker data daily after market close (5:00 PM EST, weekdays)
-   0 17 * * 1-5 cd /Users/mark/src/everydaydevops/cached-yfinance && python tools/ticker_collector.py --config tools/ticker_collector_config.json >> /tmp/ticker_collector.log 2>&1
+   0 17 * * 1-5 cd path_to_directory/cached-yfinance && python tools/ticker_collector.py --config tools/ticker_collector_config.json >> /tmp/ticker_collector.log 2>&1
    ```
 
-   **Note:** Replace `/Users/mark/src/everydaydevops/cached-yfinance` with your actual project path.
+   **Note:** Replace `path_to_directory` with your actual project path.
 
 3. **Save and exit** the crontab editor.
 
@@ -230,10 +230,10 @@ To automatically collect options data during market hours using `options_collect
 
    ```bash
    # Collect options data every 15 minutes during market hours (9:30 AM - 4:00 PM EST, weekdays)
-   */15 9-16 * * 1-5 cd /Users/mark/src/everydaydevops/cached-yfinance && python tools/options_collector.py --config tools/options_collector_config.json >> /tmp/options_collector.log 2>&1
+   */15 9-16 * * 1-5 cd path_to_directory/cached-yfinance && python tools/options_collector.py --config tools/options_collector_config.json >> /tmp/options_collector.log 2>&1
    ```
 
-   **Note:** Replace `/Users/mark/src/everydaydevops/cached-yfinance` with your actual project path.
+   **Note:** Replace `path_to_directory` with your actual project path.
 
 3. **Save and exit** the crontab editor.
 
