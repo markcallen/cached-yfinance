@@ -12,4 +12,4 @@ echo "   DAYS: $DAYS"
 echo "   CACHE_DIR: $CACHE_DIR"
 echo ""
 
-python tools/download_data.py "$TICKER" --interval "$INTERVAL" --days "$DAYS" --cache-dir "$CACHE_DIR"
+uv run python tools/download_data.py "$TICKER" --interval "$INTERVAL" --days "$DAYS" --cache-dir "$CACHE_DIR"

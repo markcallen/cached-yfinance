@@ -1,0 +1,19 @@
+{
+  "tickers": [
+    "SPY",
+    "QQQ",
+    "IWM",
+    "AAPL",
+    "TSLA",
+    "MSFT",
+    "GOOGL",
+    "AMZN"
+  ],
+  "cache_dir": null,
+  "log_file": "/tmp/ticker_collector.log",
+  "timezone": "America/New_York",
+  "market_open": "09:30",
+  "market_close": "16:00",
+  "days": 30,
+  "interval": "1m"
+}

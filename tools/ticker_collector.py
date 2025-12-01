@@ -1,21 +1,22 @@
 #!/usr/bin/env python3
 """
-Market Hours Options Data Collector
+Daily 1-Minute Ticker Data Collector
 
-This script is designed to run via cron every 15 minutes during market hours
-(9:30 AM - 4:00 PM EST, Monday-Friday) to collect historical options data.
+This script is designed to run daily (typically after market close) to collect
+1-minute historical data for a set of tickers. The data is automatically cached
+to disk for faster subsequent access.
 
 The script automatically:
-- Checks if markets are open (US market hours on weekdays)
-- Downloads options data for specified tickers with timestamps
+- Downloads 1-minute data for specified tickers
 - Handles errors gracefully and logs activity
-- Skips execution on weekends and holidays
+- Supports configurable date ranges (default: last 7 days for 1-minute data)
+- Automatically adjusts to 29 days max for 1-minute data (Yahoo Finance limit is <30 days)
 
 Usage:
-    python market_hours_collector.py [--config CONFIG_FILE] [--cache-dir CACHE_DIR]
+    python ticker_collector.py [--config CONFIG_FILE] [--cache-dir CACHE_DIR]
 
-Cron example (every 15 minutes during market hours):
-    */15 9-16 * * 1-5 /usr/bin/python3 /path/to/market_hours_collector.py --config /path/to/config.json
+Cron example (daily at 5:00 PM EST after market close):
+    0 17 * * 1-5 /usr/bin/python3 /path/to/ticker_collector.py --config /path/to/config.json
 
 Configuration file format (JSON):
 {
@@ -24,7 +25,8 @@ Configuration file format (JSON):
     "log_file": "/path/to/collector.log",
     "timezone": "America/New_York",
     "market_open": "09:30",
-    "market_close": "16:00"
+    "market_close": "16:00",
+    "days": 7
 }
 """
 
@@ -32,12 +34,11 @@ import argparse
 import json
 import logging
 import sys
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, Optional
 
 import pandas as pd
-import pytz
 
 
 # Add the parent directory to the path so we can import cached_yfinance
@@ -55,13 +56,14 @@ DEFAULT_CONFIG = {
     "timezone": "America/New_York",
     "market_open": "09:30",
     "market_close": "16:00",
-    "max_expirations": 5,  # Limit to nearest 5 expirations to avoid too much data
+    "days": 7,  # Number of days to download (Yahoo Finance limits 1m data to <30 days)
+    "interval": "1m",  # Data interval (1m, 5m, 15m, 30m, 1h, 1d, etc.)
 }
 
 
 def setup_logging(log_file: Optional[str] = None) -> logging.Logger:
     """Setup logging configuration."""
-    logger = logging.getLogger("market_collector")
+    logger = logging.getLogger("ticker_collector")
     logger.setLevel(logging.INFO)
 
     # Remove existing handlers
@@ -83,40 +85,6 @@ def setup_logging(log_file: Optional[str] = None) -> logging.Logger:
     logger.addHandler(handler)
 
     return logger
-
-
-def is_market_open(config: Dict) -> bool:
-    """
-    Check if the market is currently open based on configuration.
-
-    Args:
-        config: Configuration dictionary with timezone and market hours
-
-    Returns:
-        True if market is open, False otherwise
-    """
-    try:
-        # Get timezone
-        tz = pytz.timezone(config["timezone"])
-        now = datetime.now(tz)
-
-        # Check if it's a weekday (Monday=0, Sunday=6)
-        if now.weekday() >= 5:  # Saturday or Sunday
-            return False
-
-        # Parse market hours
-        market_open = datetime.strptime(config["market_open"], "%H:%M").time()
-        market_close = datetime.strptime(config["market_close"], "%H:%M").time()
-
-        current_time = now.time()
-
-        # Check if current time is within market hours
-        return market_open <= current_time <= market_close
-
-    except Exception as e:
-        # If we can't determine market hours, assume closed for safety
-        logging.error(f"Error checking market hours: {e}")
-        return False
 
 
 def load_config(config_file: Optional[str] = None) -> Dict:
@@ -143,19 +111,21 @@ def load_config(config_file: Optional[str] = None) -> Dict:
     return config
 
 
-def collect_options_data(
+def collect_1m_data(
     ticker: str,
     client: cyf.CachedYFClient,
-    max_expirations: int,
+    days: int,
+    interval: str,
     logger: logging.Logger,
 ) -> Dict:
     """
-    Collect options data for a single ticker.
+    Collect ticker data for a single ticker.
 
     Args:
         ticker: Stock ticker symbol
         client: CachedYFClient instance
-        max_expirations: Maximum number of expirations to process
+        days: Number of days to download
+        interval: Data interval (1m, 5m, 15m, 30m, 1h, 1d, etc.)
         logger: Logger instance
 
     Returns:
@@ -164,69 +134,68 @@ def collect_options_data(
     stats = {
         "ticker": ticker,
         "success": False,
-        "expirations_processed": 0,
-        "total_contracts": 0,
+        "data_points": 0,
+        "date_range": None,
         "error": None,
     }
 
     try:
-        # Get available expirations (limit to avoid too much data)
-        expirations = client.get_options_expirations(ticker, use_cache=False)
-        if not expirations:
-            stats["error"] = "No expirations available"
-            return stats
+        # Validate days for 1-minute data (Yahoo Finance limits to <30 days)
+        # Yahoo Finance requires start date to be strictly less than 30 days ago
+        adjusted_days = days
+        if interval == "1m" and adjusted_days >= 30:
+            logger.warning(
+                f"{ticker}: Yahoo Finance limits 1-minute data to less than 30 days. "
+                f"Adjusting from {adjusted_days} to 29 days."
+            )
+            adjusted_days = 29
 
-        # Limit expirations to process
-        expirations_to_process = expirations[:max_expirations]
-        logger.info(f"{ticker}: Processing {len(expirations_to_process)} expirations")
-
-        total_contracts = 0
-
-        for expiration in expirations_to_process:
-            try:
-                option_chain = client.get_option_chain(
-                    ticker,
-                    expiration=expiration,
-                    use_cache=False,  # Always fetch fresh data (timestamps auto-generated)
-                )
-
-                calls_count = (
-                    len(option_chain.calls) if not option_chain.calls.empty else 0
-                )
-                puts_count = (
-                    len(option_chain.puts) if not option_chain.puts.empty else 0
-                )
-                contracts = calls_count + puts_count
-
-                if contracts > 0:
-                    total_contracts += contracts
-                    logger.debug(
-                        f"{ticker} {expiration}: {calls_count} calls, {puts_count} puts"
-                    )
-
-            except Exception as e:
-                logger.warning(f"Error processing {ticker} {expiration}: {e}")
-                continue
-
-        stats["success"] = True
-        stats["expirations_processed"] = len(expirations_to_process)
-        stats["total_contracts"] = total_contracts
+        # Calculate date range
+        end_date = datetime.now()
+        start_date = end_date - timedelta(days=adjusted_days)
 
         logger.info(
-            f"{ticker}: Successfully collected {total_contracts:,} contracts across {len(expirations_to_process)} expirations"
+            f"{ticker}: Downloading {interval} data from {start_date.strftime('%Y-%m-%d')} "
+            f"to {end_date.strftime('%Y-%m-%d')}"
+        )
+
+        # Download the data
+        data = client.download(
+            ticker.upper(),
+            start=start_date,
+            end=end_date,
+            interval=interval,
+            progress=False,
+        )
+
+        if data.empty:
+            stats["error"] = "No data returned"
+            logger.warning(f"{ticker}: No data found")
+            return stats
+
+        stats["success"] = True
+        stats["data_points"] = len(data)
+        stats["date_range"] = (
+            f"{data.index[0].strftime('%Y-%m-%d %H:%M')} to "
+            f"{data.index[-1].strftime('%Y-%m-%d %H:%M')}"
+        )
+
+        logger.info(
+            f"{ticker}: Successfully collected {stats['data_points']:,} data points "
+            f"({stats['date_range']})"
         )
 
     except Exception as e:
         stats["error"] = str(e)
-        logger.error(f"Error collecting data for {ticker}: {e}")
+        logger.error(f"Error collecting {interval} data for {ticker}: {e}")
 
     return stats
 
 
 def main():
-    """Main entry point for the market hours collector."""
+    """Main entry point for the daily 1-minute collector."""
     parser = argparse.ArgumentParser(
-        description="Collect options data during market hours",
+        description="Collect 1-minute ticker data daily",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Configuration file format (JSON):
@@ -237,11 +206,11 @@ Configuration file format (JSON):
     "timezone": "America/New_York",
     "market_open": "09:30",
     "market_close": "16:00",
-    "max_expirations": 5
+    "days": 7
 }
 
-Cron example (every 15 minutes during market hours):
-*/15 9-16 * * 1-5 /usr/bin/python3 /path/to/market_hours_collector.py --config /path/to/config.json
+Cron example (daily at 5:00 PM EST after market close):
+0 17 * * 1-5 /usr/bin/python3 /path/to/ticker_collector.py --config /path/to/config.json
         """,
     )
 
@@ -252,9 +221,9 @@ Cron example (every 15 minutes during market hours):
     )
 
     parser.add_argument(
-        "--force",
-        action="store_true",
-        help="Force execution even if market appears closed (for testing)",
+        "--days",
+        type=int,
+        help="Number of days to download (overrides config file, default: 7)",
     )
 
     parser.add_argument(
@@ -278,28 +247,27 @@ Cron example (every 15 minutes during market hours):
     if args.cache_dir:
         config["cache_dir"] = args.cache_dir
 
+    # Override days if specified
+    if args.days:
+        config["days"] = args.days
+
     # Setup logging
     logger = setup_logging(config.get("log_file"))
 
     # Log startup
     logger.info("=" * 60)
-    logger.info("Market Hours Options Collector Starting")
+    logger.info("Daily 1-Minute Ticker Data Collector Starting")
     logger.info(f"Tickers: {config['tickers']}")
     logger.info(f"Cache directory: {config['cache_dir'] or '~/.cache/yfinance'}")
-    logger.info(f"Max expirations per ticker: {config['max_expirations']}")
-
-    # Check if market is open (unless forced)
-    if not args.force and not is_market_open(config):
-        logger.info("Market is closed. Exiting.")
-        return
-
-    if args.force:
-        logger.warning("Forced execution (market may be closed)")
+    logger.info(f"Days to download: {config['days']}")
 
     if args.dry_run:
         logger.info("DRY RUN - No data will be downloaded")
         for ticker in config["tickers"]:
-            logger.info(f"Would collect options data for {ticker}")
+            interval = config.get("interval", "1m")
+            logger.info(
+                f"Would collect {interval} data for {ticker} (last {config['days']} days)"
+            )
         return
 
     # Initialize client
@@ -315,17 +283,19 @@ Cron example (every 15 minutes during market hours):
 
     # Collect data for each ticker
     total_tickers = len(config["tickers"])
-    total_contracts = 0
+    total_data_points = 0
     successful_tickers = 0
 
     for i, ticker in enumerate(config["tickers"], 1):
         logger.info(f"[{i}/{total_tickers}] Processing {ticker}...")
 
-        stats = collect_options_data(ticker, client, config["max_expirations"], logger)
+        stats = collect_1m_data(
+            ticker, client, config["days"], config.get("interval", "1m"), logger
+        )
 
         if stats["success"]:
             successful_tickers += 1
-            total_contracts += stats["total_contracts"]
+            total_data_points += stats["data_points"]
         else:
             logger.error(f"{ticker}: {stats['error']}")
 
@@ -333,9 +303,9 @@ Cron example (every 15 minutes during market hours):
     logger.info("-" * 40)
     logger.info("Collection Summary:")
     logger.info(f"  Successful tickers: {successful_tickers}/{total_tickers}")
-    logger.info(f"  Total contracts collected: {total_contracts:,}")
+    logger.info(f"  Total data points collected: {total_data_points:,}")
     logger.info(f"  Timestamp: {pd.Timestamp.now().isoformat()}")
-    logger.info("Market Hours Options Collector Complete")
+    logger.info("Daily 1-Minute Ticker Data Collector Complete")
     logger.info("=" * 60)
 
 
