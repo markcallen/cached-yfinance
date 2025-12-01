@@ -44,4 +44,4 @@ LABEL maintainer="markcallen"
 LABEL description="Download historical stock data using cached-yfinance"
 LABEL version="${VERSION}"
 
-CMD ["scripts/download_data.sh"]
+CMD ["./scripts/download_data.sh"]
