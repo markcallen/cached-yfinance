@@ -12,19 +12,23 @@ ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 
 # Copy project files
-COPY pyproject.toml README.md ./
+COPY pyproject.toml uv.lock README.md ./
 COPY cached_yfinance/ ./cached_yfinance/
-COPY tools/download_data.py ./tools/
-COPY scripts/entrypoint.sh ./scripts/
+COPY tools/ ./tools/
+COPY scripts/ ./scripts/
 
 # Install Python dependencies using uv
-RUN uv pip install --system --no-cache -e .
+RUN uv sync --frozen
 
 # Create cache directory
 RUN mkdir -p /cache
 
 # Make entrypoint script executable
 RUN chmod +x ./scripts/entrypoint.sh
+RUN chmod +x ./scripts/download_data.sh
+
+RUN chmod 775 /app
+RUN chown -R 1000:1000 /app
 
 # Set default environment variables
 ENV TICKER=""
@@ -39,3 +43,5 @@ ENTRYPOINT ["./scripts/entrypoint.sh"]
 LABEL maintainer="markcallen"
 LABEL description="Download historical stock data using cached-yfinance"
 LABEL version="${VERSION}"
+
+CMD ["./scripts/download_data.sh"]

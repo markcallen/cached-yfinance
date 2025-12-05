@@ -88,30 +88,33 @@ python download_options_data.py AAPL --cache-dir ~/my_options_cache
 - ✅ Shows cache location and file count
 - ✅ Handles errors gracefully
 
-### 3. `market_hours_collector.py` - Automated Market Hours Data Collection
+### 3. `ticker_collector.py` - Automated Ticker Data Collection
 
-**NEW!** Automated script designed for cron execution to collect options data every 15 minutes during market hours (9:30 AM - 4:00 PM EST, weekdays). Perfect for building historical options datasets.
+Automated script designed for cron execution to collect ticker/historical price data daily (typically after market close). Perfect for maintaining up-to-date historical datasets for multiple tickers.
 
 **Usage:**
 
 ```bash
-python market_hours_collector.py [--config CONFIG_FILE] [--cache-dir CACHE_DIR] [--force] [--dry-run]
+python ticker_collector.py [--config CONFIG_FILE] [--cache-dir CACHE_DIR] [--days DAYS] [--dry-run]
 ```
 
 **Examples:**
 
 ```bash
 # Run with default configuration
-python market_hours_collector.py
+python ticker_collector.py
 
 # Use custom configuration file
-python market_hours_collector.py --config my_config.json
+python ticker_collector.py --config ticker_collector_config.json
 
-# Force execution (ignore market hours check)
-python market_hours_collector.py --force
+# Override days to download
+python ticker_collector.py --config ticker_collector_config.json --days 14
 
 # Dry run (show what would be collected)
-python market_hours_collector.py --dry-run
+python ticker_collector.py --dry-run
+
+# Use custom cache directory
+python ticker_collector.py --cache-dir ~/my_ticker_cache
 ```
 
 **Configuration File Format (JSON):**
@@ -120,7 +123,59 @@ python market_hours_collector.py --dry-run
 {
   "tickers": ["SPY", "QQQ", "IWM", "AAPL", "TSLA"],
   "cache_dir": null,
-  "log_file": "/tmp/market_collector.log",
+  "log_file": "/tmp/ticker_collector.log",
+  "timezone": "America/New_York",
+  "market_open": "09:30",
+  "market_close": "16:00",
+  "days": 30,
+  "interval": "1m"
+}
+```
+
+**Features:**
+
+- ✅ **Automated daily collection** designed for cron execution
+- ✅ **Configurable ticker lists** and collection parameters
+- ✅ **Automatic interval validation** (enforces <30 day limit for 1-minute data)
+- ✅ **Comprehensive logging** with rotation support
+- ✅ **Error handling and recovery** for reliable automation
+- ✅ **Dry run mode** for testing configurations
+- ✅ **Multiple timezone support** for different markets
+- ✅ **Progress tracking** with summary statistics
+
+### 4. `options_collector.py` - Automated Options Data Collection
+
+Automated script designed for cron execution to collect options data every 15 minutes during market hours (9:30 AM - 4:00 PM EST, weekdays). Perfect for building historical options datasets.
+
+**Usage:**
+
+```bash
+python options_collector.py [--config CONFIG_FILE] [--cache-dir CACHE_DIR] [--force] [--dry-run]
+```
+
+**Examples:**
+
+```bash
+# Run with default configuration
+python options_collector.py
+
+# Use custom configuration file
+python options_collector.py --config my_config.json
+
+# Force execution (ignore market hours check)
+python options_collector.py --force
+
+# Dry run (show what would be collected)
+python options_collector.py --dry-run
+```
+
+**Configuration File Format (JSON):**
+
+```json
+{
+  "tickers": ["SPY", "QQQ", "IWM", "AAPL", "TSLA"],
+  "cache_dir": null,
+  "log_file": "/tmp/options_collector.log",
   "timezone": "America/New_York",
   "market_open": "09:30",
   "market_close": "16:00",
@@ -138,11 +193,32 @@ python market_hours_collector.py --dry-run
 - ✅ **Dry run mode** for testing configurations
 - ✅ **Multiple timezone support** for different markets
 
-## 🔄 Setting Up Automated Market Hours Collection with Cron
+## 🔄 Setting Up Automated Data Collection with Cron
 
-To automatically collect options data during market hours using `market_hours_collector.py`, you can set up a cron job that runs every 15 minutes during market hours (9:30 AM - 4:00 PM EST, weekdays).
+### Cron Setup for Ticker Collector
 
-### Cron Setup for Market Hours Collector
+To automatically collect ticker data daily (typically after market close) using `ticker_collector.py`, you can set up a cron job.
+
+1. **Open your crontab for editing:**
+
+   ```bash
+   crontab -e
+   ```
+
+2. **Add the following cron job entry:**
+
+   ```bash
+   # Collect ticker data daily after market close (5:00 PM EST, weekdays)
+   0 17 * * 1-5 cd path_to_directory/cached-yfinance && python tools/ticker_collector.py --config tools/ticker_collector_config.json >> /tmp/ticker_collector.log 2>&1
+   ```
+
+   **Note:** Replace `path_to_directory` with your actual project path.
+
+3. **Save and exit** the crontab editor.
+
+### Cron Setup for Options Collector
+
+To automatically collect options data during market hours using `options_collector.py`, you can set up a cron job that runs every 15 minutes during market hours (9:30 AM - 4:00 PM EST, weekdays).
 
 1. **Open your crontab for editing:**
 
@@ -154,21 +230,31 @@ To automatically collect options data during market hours using `market_hours_co
 
    ```bash
    # Collect options data every 15 minutes during market hours (9:30 AM - 4:00 PM EST, weekdays)
-   */15 9-16 * * 1-5 cd /Users/mark/src/everydaydevops/cached-yfinance && python tools/market_hours_collector.py --config tools/market_collector_config.json >> /tmp/market_collector.log 2>&1
+   */15 9-16 * * 1-5 cd path_to_directory/cached-yfinance && python tools/options_collector.py --config tools/options_collector_config.json >> /tmp/options_collector.log 2>&1
    ```
 
-   **Note:** Replace `/Users/mark/src/everydaydevops/cached-yfinance` with your actual project path.
+   **Note:** Replace `path_to_directory` with your actual project path.
 
 3. **Save and exit** the crontab editor.
 
 ### Configuration
 
-The `market_hours_collector.py` uses the `market_collector_config.json` file for configuration. You can customize the tickers, cache directory, and other settings by editing this file.
+The collectors use JSON configuration files:
+- `ticker_collector.py` uses `ticker_collector_config.json` for configuration
+- `options_collector.py` uses `options_collector_config.json` for configuration
+
+You can customize the tickers, cache directory, and other settings by editing these files.
 
 ### Monitoring
 
-- **View logs:** `tail -f /tmp/market_collector.log`
-- **Test manually:** `python tools/market_hours_collector.py --dry-run`
+**Ticker Collector:**
+- **View logs:** `tail -f /tmp/ticker_collector.log`
+- **Test manually:** `python tools/ticker_collector.py --dry-run`
+- **List cron jobs:** `crontab -l`
+
+**Options Collector:**
+- **View logs:** `tail -f /tmp/options_collector.log`
+- **Test manually:** `python tools/options_collector.py --dry-run`
 - **List cron jobs:** `crontab -l`
 
 ## 🔄 Additional Automated Data Updates with Cron
@@ -192,8 +278,8 @@ For setting up cron jobs for the other data collection tools, follow these steps
 Collect options data every 15 minutes during market hours to build comprehensive historical datasets:
 
 ```bash
-# Automated market hours collection (every 15 minutes, 9:30 AM - 4:00 PM EST, weekdays)
-*/15 9-16 * * 1-5 cd path_to_directory/cached-yfinance && python tools/market_hours_collector.py --config tools/market_collector_config.json >> /tmp/market_collector.log 2>&1
+# Automated options collection (every 15 minutes, 9:30 AM - 4:00 PM EST, weekdays)
+*/15 9-16 * * 1-5 cd path_to_directory/cached-yfinance && python tools/options_collector.py --config tools/options_collector_config.json >> /tmp/options_collector.log 2>&1
 ```
 
 **Note:** Replace `path_to_directory` with your actual project path.
@@ -354,16 +440,44 @@ print(list(timestamps))
 
 ## 🔧 Advanced Troubleshooting
 
-### Market Hours Collector Issues
+### Ticker Collector Issues
+
+1. **Data collection problems:**
+
+   ```bash
+   # Test what would be collected
+   python tools/ticker_collector.py --dry-run
+
+   # Test with custom days
+   python tools/ticker_collector.py --config tools/ticker_collector_config.json --days 7 --dry-run
+   ```
+
+2. **Missing dependencies:**
+
+   ```bash
+   pip install cached-yfinance pandas  # Required packages
+   ```
+
+3. **Configuration validation:**
+   ```bash
+   # Validate your config file
+   python -m json.tool tools/ticker_collector_config.json
+   ```
+
+4. **Interval validation:**
+   - Yahoo Finance limits 1-minute data to less than 30 days
+   - The script automatically adjusts days to 29 if you specify 30 or more for 1-minute intervals
+
+### Options Collector Issues
 
 1. **Market hours detection problems:**
 
    ```bash
    # Test market hours detection
-   python tools/market_hours_collector.py --dry-run
+   python tools/options_collector.py --dry-run
 
    # Force execution for testing
-   python tools/market_hours_collector.py --force --dry-run
+   python tools/options_collector.py --force --dry-run
    ```
 
 2. **Missing dependencies:**
@@ -375,7 +489,7 @@ print(list(timestamps))
 3. **Configuration validation:**
    ```bash
    # Validate your config file
-   python -m json.tool tools/market_collector_config.json
+   python -m json.tool tools/options_collector_config.json
    ```
 
 ### Performance Monitoring
@@ -388,5 +502,5 @@ du -sh ~/.cache/yfinance/*/options/*/historical/
 find ~/.cache/yfinance -name "*_*.parquet" | wc -l
 
 # Check collection success rate
-grep "Collection Summary" /tmp/market_collector.log | tail -10
+grep "Collection Summary" /tmp/options_collector.log | tail -10
 ```

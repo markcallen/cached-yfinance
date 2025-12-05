@@ -50,15 +50,12 @@ docs/
 *.md
 !README.md
 
-# Examples (optional - remove if you want examples in container)
+# Examples
 examples/
 
 # Development tools
 .pre-commit-config.yaml
 pyrightconfig.json
-
-# Lock files (we install from pyproject.toml)
-uv.lock
 
 # GitHub workflows
 .github/

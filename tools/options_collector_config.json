@@ -1,7 +1,7 @@
 {
   "tickers": [
     "SPY",
-    "QQQ", 
+    "QQQ",
     "IWM",
     "AAPL",
     "TSLA",
@@ -10,7 +10,7 @@
     "AMZN"
   ],
   "cache_dir": null,
-  "log_file": "/tmp/market_collector.log",
+  "log_file": "/tmp/options_collector.log",
   "timezone": "America/New_York",
   "market_open": "09:30",
   "market_close": "16:00",

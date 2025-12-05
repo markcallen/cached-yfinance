@@ -54,7 +54,7 @@ def analyze_historical_options(
     if not timestamps:
         print(f"⚠️  No historical data found for {ticker} {expiration}")
         print(
-            "   Try running the market_hours_collector.py first to collect historical data"
+            "   Try running the options_collector.py first to collect historical data"
         )
         return
 
@@ -233,7 +233,7 @@ if __name__ == "__main__":
     compare_current_vs_historical("AAPL")
 
     print("\n💡 Tips:")
-    print("1. Run market_hours_collector.py to collect historical data automatically")
+    print("1. Run options_collector.py to collect historical data automatically")
     print(
         "2. All downloads now automatically include timestamps for historical tracking"
     )
