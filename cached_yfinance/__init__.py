@@ -13,12 +13,14 @@ from .client import (
     get_option_chain,
     get_options_expirations,
 )
+from .s3_cache import S3Cache
 
 
 __version__ = "0.1.0"
 __all__ = [
     "CacheKey",
     "FileSystemCache",
+    "S3Cache",
     "OptionCacheKey",
     "CachedYFClient",
     "download",
