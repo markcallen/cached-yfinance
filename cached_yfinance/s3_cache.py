@@ -52,10 +52,16 @@ class S3Cache(FileSystemCache):
         )
 
     def _data_key(self, symbol: str, interval: str, day: date) -> str:
-        return f"{self._base_key(symbol, interval, day)}/{day:%Y-%m-%d}-{interval}.parquet"
+        return (
+            f"{self._base_key(symbol, interval, day)}/"
+            f"{day:%Y-%m-%d}-{interval}.parquet"
+        )
 
     def _meta_key(self, symbol: str, interval: str, day: date) -> str:
-        return f"{self._base_key(symbol, interval, day)}/{day:%Y-%m-%d}-{interval}.json"
+        return (
+            f"{self._base_key(symbol, interval, day)}/"
+            f"{day:%Y-%m-%d}-{interval}.json"
+        )
 
     def _option_base_key(
         self, symbol: str, expiration_date: str, timestamp: Optional[str] = None
