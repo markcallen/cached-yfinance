@@ -32,7 +32,7 @@ class S3Cache(FileSystemCache):
         if s3_client is None:
             try:
                 import boto3
-            except ModuleNotFoundError as exc:  # pragma: no cover - environment dependent
+            except ModuleNotFoundError as exc:  # pragma: no cover
                 raise ModuleNotFoundError(
                     "S3Cache requires boto3. Install cached-yfinance[s3]."
                 ) from exc
@@ -47,18 +47,15 @@ class S3Cache(FileSystemCache):
         return "/".join(pieces)
 
     def _base_key(self, symbol: str, interval: str, day: date) -> str:
-        sym = _sanitize_symbol(symbol)
-        return self._key(sym, interval, f"{day.year:04d}", f"{day.month:02d}")
+        return self._key(
+            _sanitize_symbol(symbol), interval, f"{day.year:04d}", f"{day.month:02d}"
+        )
 
     def _data_key(self, symbol: str, interval: str, day: date) -> str:
-        return self._key(
-            self._base_key(symbol, interval, day), f"{day:%Y-%m-%d}-{interval}.parquet"
-        )
+        return f"{self._base_key(symbol, interval, day)}/{day:%Y-%m-%d}-{interval}.parquet"
 
     def _meta_key(self, symbol: str, interval: str, day: date) -> str:
-        return self._key(
-            self._base_key(symbol, interval, day), f"{day:%Y-%m-%d}-{interval}.json"
-        )
+        return f"{self._base_key(symbol, interval, day)}/{day:%Y-%m-%d}-{interval}.json"
 
     def _option_base_key(
         self, symbol: str, expiration_date: str, timestamp: Optional[str] = None
@@ -85,8 +82,8 @@ class S3Cache(FileSystemCache):
         base = self._option_base_key(symbol, expiration_date, timestamp)
         if timestamp:
             ts = pd.Timestamp(timestamp)
-            return self._key(base, f"{data_type}_{ts:%H%M%S}.parquet")
-        return self._key(base, f"{data_type}.parquet")
+            return f"{base}/{data_type}_{ts:%H%M%S}.parquet"
+        return f"{base}/{data_type}.parquet"
 
     def _option_meta_key(
         self, symbol: str, expiration_date: str, timestamp: Optional[str] = None
@@ -94,8 +91,8 @@ class S3Cache(FileSystemCache):
         base = self._option_base_key(symbol, expiration_date, timestamp)
         if timestamp:
             ts = pd.Timestamp(timestamp)
-            return self._key(base, f"metadata_{ts:%H%M%S}.json")
-        return self._key(base, "metadata.json")
+            return f"{base}/metadata_{ts:%H%M%S}.json"
+        return f"{base}/metadata.json"
 
     def _exists(self, key: str) -> bool:
         try:
@@ -168,10 +165,11 @@ class S3Cache(FileSystemCache):
 
     def has_option_chain(self, key: OptionCacheKey) -> bool:
         if key.data_type in ("calls", "puts"):
-            object_key = self._option_data_key(
-                key.symbol, key.expiration_date, key.data_type, key.timestamp
+            return self._exists(
+                self._option_data_key(
+                    key.symbol, key.expiration_date, key.data_type, key.timestamp
+                )
             )
-            return self._exists(object_key)
         if key.data_type == "underlying":
             return self._exists(
                 self._option_meta_key(key.symbol, key.expiration_date, key.timestamp)
@@ -213,9 +211,7 @@ class S3Cache(FileSystemCache):
             buffer = io.BytesIO()
             frame.to_parquet(buffer)
             self._put_bytes(
-                self._option_data_key(
-                    symbol, expiration_date, data_type, timestamp
-                ),
+                self._option_data_key(symbol, expiration_date, data_type, timestamp),
                 buffer.getvalue(),
                 "application/vnd.apache.parquet",
             )
@@ -276,10 +272,7 @@ class S3Cache(FileSystemCache):
             filename = key.rsplit("/", 1)[-1]
             if not filename.startswith("metadata_") or not filename.endswith(".json"):
                 continue
-            parts = key.split("/")
-            if len(parts) < 2:
-                continue
-            date_part = parts[-2]
+            date_part = key.split("/")[-2]
             time_part = filename.removeprefix("metadata_").removesuffix(".json")
             try:
                 ts = pd.Timestamp(
