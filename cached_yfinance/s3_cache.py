@@ -31,7 +31,7 @@ class S3Cache(FileSystemCache):
         self.prefix = prefix.strip("/")
         if s3_client is None:
             try:
-                import boto3
+                import boto3  # type: ignore[import-untyped]
             except ModuleNotFoundError as exc:  # pragma: no cover
                 raise ModuleNotFoundError(
                     "S3Cache requires boto3. Install cached-yfinance[s3]."
@@ -208,7 +208,7 @@ class S3Cache(FileSystemCache):
         expiration_date: str,
         calls: pd.DataFrame,
         puts: pd.DataFrame,
-        underlying: dict,
+        underlying: dict[str, Any],
         timestamp: Optional[str] = None,
     ) -> None:
         for data_type, frame in (("calls", calls), ("puts", puts)):
@@ -270,9 +270,12 @@ class S3Cache(FileSystemCache):
     def iter_cached_option_timestamps(
         self, symbol: str, expiration_date: str
     ) -> Iterable[str]:
-        prefix = self._key(
-            _sanitize_symbol(symbol), "options", expiration_date, "historical"
-        ) + "/"
+        prefix = (
+            self._key(
+                _sanitize_symbol(symbol), "options", expiration_date, "historical"
+            )
+            + "/"
+        )
         timestamps: list[str] = []
         for key in self._list_keys(prefix):
             filename = key.rsplit("/", 1)[-1]
