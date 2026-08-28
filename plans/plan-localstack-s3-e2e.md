@@ -16,6 +16,7 @@ Add pytest e2e tests that can use a Docker Compose-started LocalStack endpoint, 
 ## Files Affected
 
 - `PRD.md` - add S3-compatible cache acceptance criteria.
+- `.github/workflows/ci.yml` - run e2e tests in a separate Docker Compose-backed job.
 - `pyproject.toml` / `uv.lock` - add dev dependencies required for LocalStack e2e tests.
 - `docker-compose.yml` - define the LocalStack S3 service for local e2e runs.
 - `tests/test_client_e2e.py` - add public client e2e coverage for price and option workflows.
@@ -35,6 +36,7 @@ Add pytest e2e tests that can use a Docker Compose-started LocalStack endpoint, 
 - `uv run pytest tests/test_client_e2e.py`
 - `docker compose up --detach localstack`
 - `LOCALSTACK_S3_ENDPOINT=http://127.0.0.1:4566 uv run pytest tests/test_s3_cache_e2e.py`
+- `uv run pytest -o addopts= tests/test_cache.py tests/test_client.py tests/test_s3_cache.py --cov=cached_yfinance --cov-report=term-missing --cov-fail-under=75`
 - `uv run ruff check .`
 - `uv run black --check .`
 - `uv run mypy cached_yfinance`
@@ -59,3 +61,4 @@ None.
 | 2026-08-28 | Added LocalStack S3 e2e coverage and completed verification. |
 | 2026-08-28 | Added Docker Compose LocalStack service and verified e2e tests against the Compose endpoint. |
 | 2026-08-28 | Added public-client filesystem e2e tests for price and option cache workflows. |
+| 2026-08-28 | Split GitHub Actions e2e execution into a separate Docker Compose-backed job. |
