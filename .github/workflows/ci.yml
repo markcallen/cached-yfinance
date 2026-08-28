@@ -48,7 +48,7 @@ jobs:
 
       - name: Test with pytest
         run: |
-          uv run pytest --cov-report=xml --cov-fail-under=75
+          uv run pytest -o addopts= --cov=cached_yfinance --cov-report=term-missing --cov-report=xml --cov-fail-under=75
 
       - name: Upload coverage reports to Codecov
         if: matrix.python-version == '3.10'

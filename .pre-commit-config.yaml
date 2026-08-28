@@ -37,7 +37,7 @@ repos:
     hooks:
       - id: pytest
         name: pytest
-        entry: uv run pytest --cov-fail-under=75
+        entry: uv run pytest -o addopts= --cov=cached_yfinance --cov-report=term-missing --cov-fail-under=75
         language: system
         pass_filenames: false
         stages: [pre-push]
