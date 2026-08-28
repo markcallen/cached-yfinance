@@ -17,8 +17,8 @@ Suggested facts to record:
 - Canonical config files: `pyproject.toml`
 - Primary CI workflows: `build.yml, ci.yml`
 - Primary release/publish workflows: `release.yml`
-- Preferred build/test/lint/format/coverage commands: `<commands>`
-- Coverage threshold: `<value>`
+- Preferred build/test/lint/format/coverage commands: `make deps`; `uv build`; `uv run ruff check .`; `uv run black --check .`; `uv run mypy cached_yfinance`; `uv run pytest -o addopts= --cov=cached_yfinance --cov-report=term-missing --cov-fail-under=75`
+- Coverage threshold: `75%`
 - Generated or protected paths agents should avoid editing directly: `dist/, .ballast/`
 
 Update this section when those facts change. If live runtime state is required, discover it separately instead of treating it as a durable repo fact.
