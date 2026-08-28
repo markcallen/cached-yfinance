@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-.PHONY: help check-uv deps setup
+.PHONY: help check-uv check-python deps setup
 
 help:
 	@printf "Available targets:\n"
@@ -14,12 +14,14 @@ check-uv:
 		exit 1; \
 	}
 
-deps: check-uv
+check-python: check-uv
+	uv run --no-sync python -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 10) else "Python 3.10 or newer is required")'
+
+deps: check-python
 	uv sync --dev
 	uv lock --check
 
 setup: deps
-	uv run python -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 10) else "Python 3.10 or newer is required")'
 	uv run pre-commit install
 	uv run pre-commit install --hook-type pre-push
 	@printf "Local environment is ready.\n"
