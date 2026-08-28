@@ -27,6 +27,7 @@ class S3Cache(FileSystemCache):
         region_name: Optional[str] = None,
         s3_client: Any = None,
     ) -> None:
+        super().__init__()
         self.bucket = bucket
         self.prefix = prefix.strip("/")
         if s3_client is None:

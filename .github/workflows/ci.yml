@@ -89,7 +89,7 @@ jobs:
         env:
           LOCALSTACK_S3_ENDPOINT: http://127.0.0.1:4566
         run: |
-          uv run pytest tests/test_client_e2e.py tests/test_s3_cache_e2e.py
+          uv run pytest -o addopts= tests/test_client_e2e.py tests/test_s3_cache_e2e.py
 
       - name: Stop LocalStack
         if: always()

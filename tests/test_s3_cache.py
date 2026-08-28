@@ -73,6 +73,12 @@ def test_market_data_round_trip() -> None:
     assert list(cache.iter_cached_days("IWM", "1d")) == [date(2026, 8, 27)]
 
 
+def test_s3_cache_initializes_filesystem_base_state() -> None:
+    cache = S3Cache("market-data", s3_client=FakeS3())
+
+    assert cache.root is not None
+
+
 def test_timestamped_option_chain_round_trip() -> None:
     s3 = FakeS3()
     cache = S3Cache("market-data", prefix="yfinance", s3_client=s3)
