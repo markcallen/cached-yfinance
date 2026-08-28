@@ -9,7 +9,7 @@ description = "A caching wrapper around yfinance for improved performance"
 readme = "README.md"
 license = {text = "MIT"}
 authors = [
-    {name = "Your Name", email = "your.email@example.com"}
+    {name = "Mark Callen"}
 ]
 keywords = ["finance", "yfinance", "cache", "stock", "market", "data"]
 classifiers = [
@@ -28,7 +28,7 @@ classifiers = [
 requires-python = ">=3.10"
 dependencies = [
     "pandas>=1.5.0",
-    "pandas-market-calendars>=5.1.3",
+    "pandas-market-calendars>=5.3.2",
     "pyarrow>=17.0.0",
     "yfinance>=0.2.0",
 ]
@@ -47,9 +47,10 @@ dev = [
     "pytest-cov>=4.0.0",
     "black>=23.0.0",
     "mypy>=1.18.0",
-    "ruff>=0.14.0",
+    "ruff>=0.15.10",
     "pandas-stubs>=2.3.2.250926",
-    "matplotlib>=3.5.0"
+    "matplotlib>=3.5.0",
+    "pre-commit>=4.6.2",
 ]
 
 [project.urls]
@@ -70,6 +71,10 @@ target-version = ['py310']
 python_version = "3.10"
 strict = true
 warn_return_any = false
+
+[[tool.mypy.overrides]]
+module = ["pandas_market_calendars", "yfinance"]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

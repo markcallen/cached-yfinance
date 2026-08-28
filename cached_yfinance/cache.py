@@ -208,7 +208,7 @@ class FileSystemCache:
         expiration_date: str,
         calls: pd.DataFrame,
         puts: pd.DataFrame,
-        underlying: dict,
+        underlying: dict[str, Any],
         timestamp: Optional[str] = None,
     ) -> None:
         """Store complete option chain data in cache."""
@@ -248,7 +248,7 @@ class FileSystemCache:
     def iter_cached_days(self, symbol: str, interval: str) -> Iterable[date]:
         sym_dir = self.root / _sanitize_symbol(symbol) / interval
         if not sym_dir.exists():
-            return []
+            return
         for year_dir in sorted(sym_dir.glob("*")):
             if not year_dir.is_dir():
                 continue
@@ -267,7 +267,7 @@ class FileSystemCache:
         """Iterate over cached option expiration dates for a symbol."""
         options_dir = self.root / _sanitize_symbol(symbol) / "options"
         if not options_dir.exists():
-            return []
+            return
         for exp_dir in sorted(options_dir.glob("*")):
             if exp_dir.is_dir():
                 yield exp_dir.name
@@ -286,7 +286,7 @@ class FileSystemCache:
         if not historical_dir.exists():
             return []
 
-        timestamps = []
+        timestamps: list[str] = []
         for date_dir in sorted(historical_dir.glob("*")):
             if not date_dir.is_dir():
                 continue

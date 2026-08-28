@@ -2,6 +2,8 @@
 
 A high-performance caching wrapper around [yfinance](https://github.com/ranaroussi/yfinance) that dramatically speeds up repeated requests for financial data.
 
+[![CI](https://github.com/markcallen/cached-yfinance/actions/workflows/ci.yml/badge.svg)](https://github.com/markcallen/cached-yfinance/actions/workflows/ci.yml) [![Build](https://github.com/markcallen/cached-yfinance/actions/workflows/build.yml/badge.svg)](https://github.com/markcallen/cached-yfinance/actions/workflows/build.yml) [![Release](https://github.com/markcallen/cached-yfinance/actions/workflows/release.yml/badge.svg)](https://github.com/markcallen/cached-yfinance/actions/workflows/release.yml) [![License](https://img.shields.io/github/license/markcallen/cached-yfinance)](LICENSE) [![GitHub Release](https://img.shields.io/github/v/release/markcallen/cached-yfinance)](https://github.com/markcallen/cached-yfinance/releases)
+
 ## 🚀 Features
 
 - **Drop-in replacement** for `yfinance.download()`
@@ -93,18 +95,18 @@ If you have the distribution files:
 
 ```bash
 # Install from wheel (recommended)
-pip install cached_yfinance-0.1.0-py3-none-any.whl
+pip install cached_yfinance-0.1.3-py3-none-any.whl
 
 # Or install from source distribution
-pip install cached_yfinance-0.1.0.tar.gz
+pip install cached_yfinance-0.1.3.tar.gz
 ```
 
 ### Building from Source
 
 #### Prerequisites
 
-- Python 3.8 or higher
-- pip (latest version recommended)
+- Python 3.10 or higher
+- uv
 
 #### Build Steps
 
@@ -118,18 +120,18 @@ pip install cached_yfinance-0.1.0.tar.gz
 2. **Install build dependencies:**
 
    ```bash
-   pip install build
+   uv sync --dev
    ```
 
 3. **Build the package:**
 
    ```bash
-   python -m build
+   uv build
    ```
 
 4. **Install the built package:**
    ```bash
-   pip install dist/cached_yfinance-0.1.0-py3-none-any.whl
+   pip install dist/cached_yfinance-0.1.3-py3-none-any.whl
    ```
 
 ### Optional Dependencies
@@ -149,9 +151,7 @@ uv add cached-yfinance[examples]
 For contributing to the project:
 
 ```bash
-pip install -e .[dev]
-# or
-uv add cached-yfinance[dev]
+uv sync --dev
 ```
 
 This installs:
@@ -240,7 +240,7 @@ Pre-built Docker images are available on Docker Hub for both AMD64 and ARM64 arc
 docker pull markcallen/cached-yfinance:latest
 
 # Or pull a specific version
-docker pull markcallen/cached-yfinance:v0.1.0
+docker pull markcallen/cached-yfinance:v0.1.3
 ```
 
 ### Building the Docker Image Locally
@@ -393,7 +393,8 @@ See the [`examples/`](examples/) directory for comprehensive usage examples:
 The [`tools/`](tools/) directory contains utility scripts for data management:
 
 - **[download_data.py](tools/download_data.py)**: Download historical data for any ticker with configurable intervals
-- **[iwm_example.py](tools/iwm_example.py)**: Comprehensive IWM analysis example with market insights
+- **[ticker_collector.py](tools/ticker_collector.py)**: Collect ticker data from the command line or config files
+- **[options_collector.py](tools/options_collector.py)**: Collect and cache option chain data
 - **[README.md](tools/README.md)**: Complete documentation for tools and cron job setup
 
 ## 🤝 Contributing
@@ -403,10 +404,12 @@ Contributions are welcome! Please feel free to submit a Pull Request. For major 
 ### Development Setup
 
 ```bash
-git clone https://github.com/yourusername/cached-yfinance.git
+git clone https://github.com/markcallen/cached-yfinance.git
 cd cached-yfinance
-uv pip install -e .[dev]
+make setup
 ```
+
+Use `make deps` when you only need to sync project and development dependencies.
 
 ### Running Tests
 
@@ -424,8 +427,8 @@ uv run pytest tests/test_cache.py::TestCacheKey::test_cache_key_creation -v
 ### Code Formatting
 
 ```bash
-black cached_yfinance/
-ruff check --fix cached_yfinance/
+uv run black cached_yfinance/
+uv run ruff check --fix cached_yfinance/
 ```
 
 ## 📄 License

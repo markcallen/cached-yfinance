@@ -226,7 +226,7 @@ def main():
         epilog="""
 Examples:
   %(prog)s AAPL                    # Download all AAPL options
-  %(prog)s TSLA --list-only        # Just list TSLA expirations  
+  %(prog)s TSLA --list-only        # Just list TSLA expirations
   %(prog)s MSFT --cache-dir /tmp   # Use custom cache directory
   %(prog)s SPY --days-ahead 90     # Only expirations in next 90 days
         """,
