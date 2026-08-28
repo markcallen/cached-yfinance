@@ -28,7 +28,16 @@ repos:
       - id: ruff
         args: [--fix]
 
-  #- repo: https://github.com/pre-commit/mirrors-mypy
-  #  rev: v1.18.2
-  #  hooks:
-  #    - id: mypy
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.0
+    hooks:
+      - id: gitleaks
+
+  - repo: local
+    hooks:
+      - id: pytest
+        name: pytest
+        entry: uv run pytest -o addopts= --cov=cached_yfinance --cov-report=term-missing --cov-fail-under=75
+        language: system
+        pass_filenames: false
+        stages: [pre-push]

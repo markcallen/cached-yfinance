@@ -1,0 +1,56 @@
+{
+  "targets": [
+    "claude",
+    "codex"
+  ],
+  "agents": [
+    "local-dev",
+    "docs",
+    "cicd",
+    "observability",
+    "publishing",
+    "git-hooks",
+    "tasks",
+    "plan-lifecycle",
+    "linting",
+    "logging",
+    "testing"
+  ],
+  "skills": [
+    "owasp-security-scan",
+    "aws-health-review",
+    "aws-live-health-review",
+    "aws-weekly-security-review",
+    "github-health-check",
+    "github-pr-copilot-cycle",
+    "ballast-audit",
+    "ballast-project-maintenance",
+    "docker-registry-publish"
+  ],
+  "ballastVersion": "5.18.3",
+  "languages": [
+    "python",
+    "docker"
+  ],
+  "paths": {
+    "docker": [
+      "."
+    ],
+    "python": [
+      "."
+    ]
+  },
+  "tools": {
+    "docker": [
+      "docker",
+      "hadolint",
+      "trivy"
+    ],
+    "python": [
+      "uv",
+      "pyenv"
+    ]
+  },
+  "taskSystem": "github",
+  "deploymentModel": "none"
+}

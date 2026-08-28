@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from functools import lru_cache
-from typing import Dict, Iterable, List, NamedTuple, Optional, Tuple, Union
+from typing import Any, Dict, Iterable, List, NamedTuple, Optional, Tuple, Union, cast
 
 import pandas as pd
 import yfinance as yf
@@ -25,7 +25,7 @@ class OptionChain(NamedTuple):
 
     calls: pd.DataFrame
     puts: pd.DataFrame
-    underlying: dict
+    underlying: dict[str, Any]
 
 
 @dataclass
@@ -75,8 +75,14 @@ def _parse_period_to_timedelta(period: Optional[str]) -> Optional[pd.Timedelta]:
                 value *= 30
             elif unit == "days" and suffix == "y":
                 value *= 365
-            kwargs = {unit: value}
-            return pd.Timedelta(**kwargs)
+            if unit == "days":
+                return pd.Timedelta(days=value)
+            if unit == "weeks":
+                return pd.Timedelta(weeks=value)
+            if unit == "hours":
+                return pd.Timedelta(hours=value)
+            if unit == "minutes":
+                return pd.Timedelta(minutes=value)
     try:
         return pd.to_timedelta(period)
     except Exception:
@@ -84,8 +90,8 @@ def _parse_period_to_timedelta(period: Optional[str]) -> Optional[pd.Timedelta]:
 
 
 def _normalize_range(
-    start: Optional[pd.Timestamp],
-    end: Optional[pd.Timestamp],
+    start: Optional[Union[str, datetime, pd.Timestamp]],
+    end: Optional[Union[str, datetime, pd.Timestamp]],
     period: Optional[str],
     interval: str,
 ) -> Tuple[Optional[pd.Timestamp], Optional[pd.Timestamp]]:
@@ -108,7 +114,7 @@ def _normalize_range(
 
 
 @lru_cache(maxsize=1)
-def _nyse_calendar():
+def _nyse_calendar() -> Any:
     if mcal is None:
         return None
     try:  # pragma: no cover - relies on optional dependency
@@ -170,7 +176,7 @@ class CachedYFClient:
     Wrapper around yfinance.download that persists responses to disk.
     """
 
-    def __init__(self, cache: Optional[FileSystemCache] = None):
+    def __init__(self, cache: Optional[FileSystemCache] = None) -> None:
         self.cache = cache or FileSystemCache()
 
     def download(
@@ -180,7 +186,7 @@ class CachedYFClient:
         end: Optional[Union[str, datetime, pd.Timestamp]] = None,
         period: Optional[str] = None,
         interval: str = "1d",
-        **kwargs,
+        **kwargs: object,
     ) -> pd.DataFrame:
         if isinstance(tickers, list):
             if len(tickers) != 1:
@@ -251,17 +257,19 @@ class CachedYFClient:
         if req.start is not None:
             # Ensure timezone consistency for comparison
             start_tz = req.start
-            if merged.index.tz is not None and start_tz.tz is None:
-                start_tz = start_tz.tz_localize(merged.index.tz)
-            elif merged.index.tz is None and start_tz.tz is not None:
+            merged_index = cast(pd.DatetimeIndex, merged.index)
+            if merged_index.tz is not None and start_tz.tz is None:
+                start_tz = start_tz.tz_localize(merged_index.tz)
+            elif merged_index.tz is None and start_tz.tz is not None:
                 start_tz = start_tz.tz_localize(None)
             merged = merged[merged.index >= start_tz]
         if req.end is not None:
             # Ensure timezone consistency for comparison
             end_tz = req.end
-            if merged.index.tz is not None and end_tz.tz is None:
-                end_tz = end_tz.tz_localize(merged.index.tz)
-            elif merged.index.tz is None and end_tz.tz is not None:
+            merged_index = cast(pd.DatetimeIndex, merged.index)
+            if merged_index.tz is not None and end_tz.tz is None:
+                end_tz = end_tz.tz_localize(merged_index.tz)
+            elif merged_index.tz is None and end_tz.tz is not None:
                 end_tz = end_tz.tz_localize(None)
             merged = merged[merged.index <= end_tz]
 
@@ -496,8 +504,16 @@ class CachedYFClient:
                 puts = self.cache.load_option_chain(puts_key)
                 underlying = self.cache.load_option_chain(underlying_key)
 
-                if calls is not None and puts is not None and underlying is not None:
-                    return OptionChain(calls=calls, puts=puts, underlying=underlying)
+                if (
+                    isinstance(calls, pd.DataFrame)
+                    and isinstance(puts, pd.DataFrame)
+                    and isinstance(underlying, dict)
+                ):
+                    return OptionChain(
+                        calls=calls,
+                        puts=puts,
+                        underlying=underlying,
+                    )
 
         # Fetch from yfinance
         yf_ticker = yf.Ticker(ticker)
