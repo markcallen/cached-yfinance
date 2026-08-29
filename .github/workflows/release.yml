@@ -89,8 +89,7 @@ jobs:
       - name: Push commit and tag
         run: |
           set -euo pipefail
-          git push origin HEAD:${{ github.ref_name }}
-          git push origin "v${{ steps.version.outputs.version }}"
+          git push --atomic origin HEAD:${{ github.ref_name }} "v${{ steps.version.outputs.version }}"
 
   build-and-release:
     if: ${{ always() && ((github.event_name == 'workflow_dispatch' && needs.bump_and_tag.result == 'success') || (github.event_name == 'push' && github.actor != 'github-actions[bot]')) }}

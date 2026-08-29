@@ -5,11 +5,17 @@ repos:
     hooks:
       - id: check-json
       - id: check-yaml
+        exclude: ^\.github/workflows/
       - id: check-added-large-files
       - id: trailing-whitespace
       - id: end-of-file-fixer
       - id: detect-private-key
       - id: check-merge-conflict
+
+  - repo: https://github.com/rhysd/actionlint
+    rev: v1.7.12
+    hooks:
+      - id: actionlint
 
   - repo: https://github.com/adrienverge/yamllint
     rev: v1.37.1
