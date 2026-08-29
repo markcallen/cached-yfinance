@@ -15,7 +15,7 @@ import pytest
 from cached_yfinance import CacheKey, OptionCacheKey, S3Cache
 
 
-LOCALSTACK_IMAGE = "localstack/localstack:3.8"
+LOCALSTACK_IMAGE = environ.get("LOCALSTACK_IMAGE", "localstack/localstack:3.8")
 
 
 def _free_port() -> int:

@@ -109,7 +109,9 @@ class S3Cache(FileSystemCache):
             response = getattr(exc, "response", {})
             status = response.get("ResponseMetadata", {}).get("HTTPStatusCode")
             code = response.get("Error", {}).get("Code")
-            if status == 404 or code in {"404", "NoSuchKey", "NotFound"}:
+            if code in {"404", "NoSuchKey", "NotFound"} or (
+                status == 404 and code is None
+            ):
                 return False
             raise
 

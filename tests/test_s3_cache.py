@@ -15,6 +15,14 @@ class NotFoundError(Exception):
         }
 
 
+class MissingBucketError(Exception):
+    def __init__(self) -> None:
+        self.response = {
+            "ResponseMetadata": {"HTTPStatusCode": 404},
+            "Error": {"Code": "NoSuchBucket"},
+        }
+
+
 class FakeBody:
     def __init__(self, value: bytes) -> None:
         self.value = value
@@ -119,6 +127,22 @@ def test_missing_objects_return_false_or_none() -> None:
 
     assert cache.has(key) is False
     assert cache.load(key) is None
+
+
+def test_missing_bucket_error_is_not_treated_as_cache_miss() -> None:
+    class MissingBucketS3(FakeS3):
+        def head_object(self, *, Bucket: str, Key: str) -> dict:
+            raise MissingBucketError()
+
+    cache = S3Cache("missing-bucket", s3_client=MissingBucketS3())
+    key = CacheKey(symbol="IWM", interval="1d", day=date(2026, 8, 27))
+
+    try:
+        cache.has(key)
+    except MissingBucketError:
+        pass
+    else:
+        raise AssertionError("Expected missing bucket errors to propagate")
 
 
 def test_option_listing_is_sorted_and_unique() -> None:

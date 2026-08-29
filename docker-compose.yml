@@ -1,6 +1,6 @@
 services:
   localstack:
-    image: localstack/localstack:3.8
+    image: ${LOCALSTACK_IMAGE:-localstack/localstack:3.8}
     ports:
       - "127.0.0.1:4566:4566"
     environment:
