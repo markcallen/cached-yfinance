@@ -70,9 +70,7 @@ jobs:
             fi
           fi
 
-          PYPROJECT_VERSION="$(
-            uv run python -c 'import pathlib, tomllib; data = tomllib.loads(pathlib.Path("pyproject.toml").read_text(encoding="utf-8")); print(data["project"]["version"])'
-          )"
+          PYPROJECT_VERSION="$(uv version --short)"
 
           if [ "$VERSION" != "$PYPROJECT_VERSION" ]; then
             echo "Release version $VERSION does not match pyproject.toml version $PYPROJECT_VERSION."
