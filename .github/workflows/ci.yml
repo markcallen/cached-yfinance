@@ -48,7 +48,7 @@ jobs:
 
       - name: Test with pytest
         run: |
-          uv run pytest -o addopts= --cov=cached_yfinance --cov-report=term-missing --cov-report=xml --cov-fail-under=75
+          uv run pytest -o addopts= --ignore-glob='*e2e.py' --cov=cached_yfinance --cov-report=term-missing --cov-report=xml --cov-fail-under=75
 
       - name: Upload coverage reports to Codecov
         if: matrix.python-version == '3.10'
@@ -56,3 +56,42 @@ jobs:
         with:
           file: ./coverage.xml
           fail_ci_if_error: false
+
+  e2e:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: "latest"
+
+      - name: Install dependencies
+        run: |
+          uv sync --dev
+
+      - name: Validate Compose config
+        run: |
+          docker compose config
+
+      - name: Start LocalStack
+        run: |
+          docker compose up --detach localstack
+
+      - name: Run E2E tests
+        env:
+          LOCALSTACK_S3_ENDPOINT: http://127.0.0.1:4566
+        run: |
+          uv run pytest -o addopts= tests/test_client_e2e.py tests/test_s3_cache_e2e.py
+
+      - name: Stop LocalStack
+        if: always()
+        run: |
+          docker compose down --volumes

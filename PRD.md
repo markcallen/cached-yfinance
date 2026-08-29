@@ -448,6 +448,8 @@ print(f"Cache size: {cache_size / 1024 / 1024:.2f} MB")
 - **Real Data:** Test with actual yfinance data
 - **Performance:** Verify speed improvements
 - **Compatibility:** Test across Python versions
+- **CORE-E2E-1:** Verify public client workflows end-to-end with real cache storage and deterministic upstream responses, including price data miss-to-hit behavior and option chain storage/reload behavior.
+- **S3-E2E-1:** Verify the S3-compatible cache backend against LocalStack, including market data round trips, option chain round trips, and object listing behavior through boto3.
 
 #### 10.1.3 Performance Tests
 
