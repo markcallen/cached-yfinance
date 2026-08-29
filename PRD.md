@@ -448,6 +448,7 @@ print(f"Cache size: {cache_size / 1024 / 1024:.2f} MB")
 - **Real Data:** Test with actual yfinance data
 - **Performance:** Verify speed improvements
 - **Compatibility:** Test across Python versions
+- **CI-TYPE-1:** Run strict mypy type checking for `cached_yfinance` in the CI Python version matrix.
 - **CORE-E2E-1:** Verify public client workflows end-to-end with real cache storage and deterministic upstream responses, including price data miss-to-hit behavior and option chain storage/reload behavior.
 - **S3-E2E-1:** Verify the S3-compatible cache backend against LocalStack, including market data round trips, option chain round trips, and object listing behavior through boto3.
 
@@ -517,6 +518,7 @@ print(f"Cache size: {cache_size / 1024 / 1024:.2f} MB")
 - **Versioning:** Semantic versioning (SemVer)
 - **Release Frequency:** Monthly minor releases, weekly patches
 - **Compatibility:** Maintain backward compatibility
+- **REL-VERSION-1:** Release automation validates that the release tag or manual dispatch version is a SemVer `v*` value and matches `pyproject.toml` before building artifacts.
 
 #### 12.1.2 GitHub Repository
 
