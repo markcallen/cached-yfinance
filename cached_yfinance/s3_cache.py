@@ -253,7 +253,7 @@ class S3Cache(FileSystemCache):
                 continue
             if cached_day not in seen:
                 seen.add(cached_day)
-                yield cached_day
+        return iter(sorted(seen))
 
     def iter_cached_option_expirations(self, symbol: str) -> Iterable[str]:
         prefix = self._key(_sanitize_symbol(symbol), "options") + "/"
