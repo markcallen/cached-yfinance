@@ -6,27 +6,106 @@ on:
       - "v*" # Triggers on version tags like v1.0.0, v1.2.3, etc.
   workflow_dispatch:
     inputs:
-      version:
-        description: "Release version to build, with or without v prefix"
+      release_type:
+        description: "Release type (patch/minor/major)"
+        type: choice
+        options:
+          - major
+          - patch
+          - minor
+        default: "patch"
         required: true
-        type: string
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: false
 
 permissions:
-  contents: write # Required for creating releases
+  contents: read
 
 jobs:
-  build-and-release:
+  bump_and_tag:
+    if: ${{ github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: "latest"
+
+      - name: Get Previous tag
+        id: previoustag
+        uses: WyriHaximus/github-action-get-previous-tag@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get next version
+        id: semvers
+        uses: WyriHaximus/github-action-next-semvers@v1
+        with:
+          version: ${{ steps.previoustag.outputs.tag }}
+
+      - name: Set version
+        id: version
+        run: |
+          if [ "${{ github.event.inputs.release_type }}" = "major" ]; then
+            echo "version=${{ steps.semvers.outputs.major }}" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event.inputs.release_type }}" = "minor" ]; then
+            echo "version=${{ steps.semvers.outputs.minor }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=${{ steps.semvers.outputs.patch }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Bump Python package version
+        run: |
+          set -euo pipefail
+          uv version "${{ steps.version.outputs.version }}" --frozen
+
+      - name: Commit and create tag
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.version.outputs.version }}"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add pyproject.toml
+          git commit -m "chore(release): bump version to ${VERSION} [skip ci]"
+
+          git tag "v${VERSION}"
+
+      - name: Push commit and tag
+        run: |
+          set -euo pipefail
+          git push origin HEAD:${{ github.ref_name }}
+          git push origin "v${{ steps.version.outputs.version }}"
+
+  build-and-release:
+    if: ${{ always() && ((github.event_name == 'workflow_dispatch' && needs.bump_and_tag.result == 'success') || (github.event_name == 'push' && github.actor != 'github-actions[bot]')) }}
+    needs:
+      - bump_and_tag
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
         with:
-          fetch-depth: 0 # Fetch full history for proper versioning
+          ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/v{0}', needs.bump_and_tag.outputs.version) || github.ref }}
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v6
@@ -51,24 +130,20 @@ jobs:
 
           if [ "$GITHUB_REF_TYPE" = "tag" ]; then
             TAG="$GITHUB_REF_NAME"
-            if ! [[ "$TAG" =~ $SEMVER_PATTERN ]]; then
-              echo "Invalid release tag: $TAG. Expected a SemVer tag like v1.2.3."
-              exit 1
-            fi
-            VERSION="${TAG#v}"
           else
-            MANUAL_VERSION="${{ inputs.version }}"
-            if [ -z "$MANUAL_VERSION" ]; then
-              echo "Invalid manual release version: value is required."
+            VERSION="${{ needs.bump_and_tag.outputs.version }}"
+            if [ -z "$VERSION" ]; then
+              echo "Invalid manual release version: bump_and_tag did not produce a version."
               exit 1
             fi
-            VERSION="${MANUAL_VERSION#v}"
             TAG="v$VERSION"
-            if ! [[ "$TAG" =~ $SEMVER_PATTERN ]]; then
-              echo "Invalid manual release version: $MANUAL_VERSION. Expected SemVer like 1.2.3 or v1.2.3."
-              exit 1
-            fi
           fi
+
+          if ! [[ "$TAG" =~ $SEMVER_PATTERN ]]; then
+            echo "Invalid release tag: $TAG. Expected a SemVer tag like v1.2.3."
+            exit 1
+          fi
+          VERSION="${TAG#v}"
 
           PYPROJECT_VERSION="$(uv version --short)"
 

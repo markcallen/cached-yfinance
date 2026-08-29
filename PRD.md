@@ -518,7 +518,7 @@ print(f"Cache size: {cache_size / 1024 / 1024:.2f} MB")
 - **Versioning:** Semantic versioning (SemVer)
 - **Release Frequency:** Monthly minor releases, weekly patches
 - **Compatibility:** Maintain backward compatibility
-- **REL-VERSION-1:** Release automation validates that the release tag or manual dispatch version is a SemVer `v*` value and matches `pyproject.toml` before building artifacts.
+- **REL-VERSION-1:** Release automation validates SemVer `v*` tags before building artifacts; manual dispatch accepts a `patch`, `minor`, or `major` release type, bumps `pyproject.toml`, creates the matching tag, and releases from that tag.
 
 #### 12.1.2 GitHub Repository
 

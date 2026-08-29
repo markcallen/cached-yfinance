@@ -52,6 +52,13 @@ def test_issue_7_release_validates_versions_before_build() -> None:
     workflow = _read_workflow(".github/workflows/release.yml")
     version_step = workflow.split("- name: Build package", maxsplit=1)[0]
 
+    assert "release_type:" in workflow
+    assert "bump_and_tag:" in workflow
+    assert "WyriHaximus/github-action-get-previous-tag@v2" in workflow
+    assert "WyriHaximus/github-action-next-semvers@v1" in workflow
+    assert 'uv version "${{ steps.version.outputs.version }}" --frozen' in workflow
+    assert "git add pyproject.toml" in workflow
+    assert "git add pyproject.toml uv.lock" not in workflow
     assert "GITHUB_REF_TYPE" in version_step
     assert "GITHUB_REF_NAME" in version_step
     assert "workflow_dispatch" in version_step
@@ -59,5 +66,6 @@ def test_issue_7_release_validates_versions_before_build() -> None:
     assert r"\+[0-9A-Za-z.-]+" in version_step
     assert "Invalid release tag" in version_step
     assert "Invalid manual release version" in version_step
+    assert "inputs.version" not in version_step
     assert "uv version --short" in version_step
     assert "does not match pyproject.toml version" in version_step
