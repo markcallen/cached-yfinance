@@ -44,7 +44,7 @@ import pytz
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import cached_yfinance as cyf
-from cached_yfinance import FileSystemCache
+from cached_yfinance import FileSystemCache, S3Cache
 
 
 # Default configuration
@@ -56,6 +56,11 @@ DEFAULT_CONFIG = {
     "market_open": "09:30",
     "market_close": "16:00",
     "max_expirations": 5,  # Limit to nearest 5 expirations to avoid too much data
+    "retention_days": None,
+    "s3_bucket": None,
+    "s3_prefix": "",
+    "s3_endpoint_url": None,
+    "s3_region": None,
 }
 
 
@@ -141,6 +146,21 @@ def load_config(config_file: Optional[str] = None) -> Dict:
             logging.info("Using default configuration")
 
     return config
+
+
+def create_cache(config: Dict) -> FileSystemCache:
+    """Create the configured cache backend for a collector run."""
+    bucket = config.get("s3_bucket")
+    if bucket:
+        return S3Cache(
+            bucket,
+            prefix=config.get("s3_prefix", ""),
+            endpoint_url=config.get("s3_endpoint_url") or None,
+            region_name=config.get("s3_region"),
+        )
+    if config["cache_dir"]:
+        return FileSystemCache(config["cache_dir"])
+    return FileSystemCache()
 
 
 def collect_options_data(
@@ -304,11 +324,8 @@ Cron example (every 15 minutes during market hours):
 
     # Initialize client
     try:
-        if config["cache_dir"]:
-            cache = FileSystemCache(config["cache_dir"])
-            client = cyf.CachedYFClient(cache)
-        else:
-            client = cyf.CachedYFClient()
+        cache = create_cache(config)
+        client = cyf.CachedYFClient(cache)
     except Exception as e:
         logger.error(f"Failed to initialize client: {e}")
         sys.exit(1)
@@ -326,6 +343,15 @@ Cron example (every 15 minutes during market hours):
         if stats["success"]:
             successful_tickers += 1
             total_contracts += stats["total_contracts"]
+            retention_days = config.get("retention_days")
+            if retention_days is not None:
+                deleted = cache.prune_option_history(ticker, int(retention_days))
+                if deleted:
+                    logger.info(
+                        "%s: removed %s expired option cache objects",
+                        ticker,
+                        deleted,
+                    )
         else:
             logger.error(f"{ticker}: {stats['error']}")
 
