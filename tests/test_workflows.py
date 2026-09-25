@@ -1,6 +1,7 @@
 """Regression tests for GitHub Actions workflow requirements."""
 
 import re
+import subprocess
 from pathlib import Path
 
 
@@ -9,6 +10,32 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 
 def _read_workflow(path: str) -> str:
     return (REPO_ROOT / path).read_text(encoding="utf-8")
+
+
+def _git(repo: Path, *args: str) -> str:
+    return subprocess.run(
+        ["git", *args],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+
+
+def _commit(repo: Path, message: str) -> str:
+    _git(repo, "commit", "--allow-empty", "-m", message)
+    return _git(repo, "rev-parse", "HEAD")
+
+
+def _run_retry_tag_finder(
+    repo: Path, base_commit: str
+) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [str(REPO_ROOT / "scripts/find_retry_release_tag.sh"), base_commit],
+        cwd=repo,
+        capture_output=True,
+        text=True,
+    )
 
 
 def _extract_python_matrix_versions(workflow: str) -> set[str]:
@@ -73,3 +100,52 @@ def test_issue_7_release_validates_versions_before_build() -> None:
     assert "inputs.version" not in version_step
     assert "uv version --short" in version_step
     assert "does not match pyproject.toml version" in version_step
+
+
+def test_retry_tag_finder_reuses_the_tag_created_from_the_original_commit(
+    tmp_path: Path,
+) -> None:
+    _git(tmp_path, "init")
+    _git(tmp_path, "config", "user.name", "Test User")
+    _git(tmp_path, "config", "user.email", "test@example.com")
+    base_commit = _commit(tmp_path, "base")
+    _commit(tmp_path, "chore(release): bump version to 1.2.3 [skip ci]")
+    _git(tmp_path, "tag", "v1.2.3")
+
+    result = _run_retry_tag_finder(tmp_path, base_commit)
+
+    assert result.returncode == 0
+    assert result.stdout.strip() == "v1.2.3"
+
+
+def test_retry_tag_finder_returns_nothing_when_no_retry_tag_exists(
+    tmp_path: Path,
+) -> None:
+    _git(tmp_path, "init")
+    _git(tmp_path, "config", "user.name", "Test User")
+    _git(tmp_path, "config", "user.email", "test@example.com")
+    base_commit = _commit(tmp_path, "base")
+
+    result = _run_retry_tag_finder(tmp_path, base_commit)
+
+    assert result.returncode == 0
+    assert result.stdout.strip() == ""
+
+
+def test_retry_tag_finder_rejects_multiple_release_tags_for_one_base_commit(
+    tmp_path: Path,
+) -> None:
+    _git(tmp_path, "init")
+    _git(tmp_path, "config", "user.name", "Test User")
+    _git(tmp_path, "config", "user.email", "test@example.com")
+    base_commit = _commit(tmp_path, "base")
+    _commit(tmp_path, "first release")
+    _git(tmp_path, "tag", "v1.2.3")
+    _git(tmp_path, "reset", "--hard", base_commit)
+    _commit(tmp_path, "second release")
+    _git(tmp_path, "tag", "v1.2.4")
+
+    result = _run_retry_tag_finder(tmp_path, base_commit)
+
+    assert result.returncode != 0
+    assert "Multiple release tags" in result.stderr

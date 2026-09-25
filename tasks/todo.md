@@ -87,8 +87,8 @@
 - Rollback steps: revert the release workflow and its regression test together.
 
 ## Outcome
-- Result: Complete. Manual releases now tolerate an already-correct package version, create the missing tag, reuse an existing tag only when it identifies the release commit, and reject a conflicting tag.
-- Evidence links/commands: `uv run pytest -o addopts= tests/test_workflows.py`, `uv run ruff check .`, `uv run black --check .`, `git diff --check`.
+- Result: Complete. Manual releases now tolerate an already-correct package version, create the missing tag, reuse a tag whose release commit was created from the original workflow commit, and reject ambiguous or conflicting tag state.
+- Evidence links/commands: `uv run pytest -o addopts= tests/test_workflows.py`, `uv run pytest -o addopts=`, `uv run ruff check .`, `uv run black --check .`, `uv run mypy cached_yfinance`, `bash -n scripts/find_retry_release_tag.sh`, `git diff --check`.
 - PRD updates: Expanded REL-VERSION-1 with safe manual-release rerun behavior.
 
 # Task: Resolve GitHub Issues 6 and 7

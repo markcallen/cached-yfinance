@@ -45,7 +45,16 @@ jobs:
         with:
           version: "latest"
 
+      - name: Find retry release tag
+        id: retry_tag
+        run: |
+          set -euo pipefail
+          git fetch --force --tags origin
+          TAG="$(./scripts/find_retry_release_tag.sh "${{ github.sha }}")"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
       - name: Get Previous tag
+        if: ${{ steps.retry_tag.outputs.tag == '' }}
         id: previoustag
         uses: WyriHaximus/github-action-get-previous-tag@v2
         env:
@@ -53,6 +62,7 @@ jobs:
 
       - name: Get next version
         id: semvers
+        if: ${{ steps.retry_tag.outputs.tag == '' }}
         uses: WyriHaximus/github-action-next-semvers@v1
         with:
           version: ${{ steps.previoustag.outputs.tag }}
@@ -60,7 +70,11 @@ jobs:
       - name: Set version
         id: version
         run: |
-          if [ "${{ github.event.inputs.release_type }}" = "major" ]; then
+          if [ -n "${{ steps.retry_tag.outputs.tag }}" ]; then
+            TAG="${{ steps.retry_tag.outputs.tag }}"
+            git checkout --detach "$TAG"
+            echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event.inputs.release_type }}" = "major" ]; then
             echo "version=${{ steps.semvers.outputs.major }}" >> "$GITHUB_OUTPUT"
           elif [ "${{ github.event.inputs.release_type }}" = "minor" ]; then
             echo "version=${{ steps.semvers.outputs.minor }}" >> "$GITHUB_OUTPUT"
