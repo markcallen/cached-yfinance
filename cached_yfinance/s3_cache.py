@@ -263,8 +263,20 @@ class S3Cache(FileSystemCache):
             if snapshot_date < cutoff:
                 expired_keys.append(object_key)
 
-        for object_key in expired_keys:
-            self.s3.delete_object(Bucket=self.bucket, Key=object_key)
+        for start in range(0, len(expired_keys), 1000):
+            batch = expired_keys[start : start + 1000]
+            response = self.s3.delete_objects(
+                Bucket=self.bucket,
+                Delete={"Objects": [{"Key": object_key} for object_key in batch]},
+            )
+            if response.get("Errors"):
+                failed_keys = ", ".join(
+                    error.get("Key", "unknown") for error in response["Errors"]
+                )
+                raise RuntimeError(
+                    f"Failed to prune {len(response['Errors'])} S3 cache objects: "
+                    f"{failed_keys}"
+                )
         return len(expired_keys)
 
     def iter_cached_days(self, symbol: str, interval: str) -> Iterable[date]:
