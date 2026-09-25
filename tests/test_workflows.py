@@ -59,6 +59,10 @@ def test_issue_7_release_validates_versions_before_build() -> None:
     assert 'uv version "${{ steps.version.outputs.version }}" --frozen' in workflow
     assert "git add pyproject.toml" in workflow
     assert "git add pyproject.toml uv.lock" not in workflow
+    assert "git diff --cached --quiet" in workflow
+    assert "already matches the release version" in workflow
+    assert "already exists on a different commit" in workflow
+    assert 'git rev-list -n 1 "v${VERSION}"' in workflow
     assert "GITHUB_REF_TYPE" in version_step
     assert "GITHUB_REF_NAME" in version_step
     assert "workflow_dispatch" in version_step
