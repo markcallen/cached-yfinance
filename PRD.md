@@ -530,6 +530,7 @@ print(f"Cache size: {cache_size / 1024 / 1024:.2f} MB")
 - **Release Frequency:** Monthly minor releases, weekly patches
 - **Compatibility:** Maintain backward compatibility
 - **REL-VERSION-1:** Release automation validates SemVer `v*` tags before building artifacts; manual dispatch accepts a `patch`, `minor`, or `major` release type, ensures `pyproject.toml` matches the calculated version, creates the matching tag, and releases from that tag. Re-running a manual release must safely reuse an already-correct package version and tag, while rejecting a tag that points to another commit. A manual release must publish the immutable Docker tag `v<version>`; a retry after the GitHub Release exists must still publish that image while avoiding duplicate release creation and asset uploads. An operator may separately republish the image for an existing SemVer release only after checking out and validating that immutable tag; this recovery workflow does not create or alter a GitHub Release.
+- **REL-CONTAINER-1:** The collector image runs as UID 1000. Any project virtual environment used by its `uv run` command must be writable by that user so a released image can start and retrieve data in Kubernetes.
 
 #### 12.1.2 GitHub Repository
 

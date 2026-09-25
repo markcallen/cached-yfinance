@@ -14,7 +14,7 @@
   workflow rather than bypassing registry controls.
 - Ensure future manual releases publish their immutable version tag and allow
   a safe retry if the GitHub Release already exists.
-- Out of scope: changing the public registry, credentials, or image contents.
+- Out of scope: changing the public registry or credentials.
 
 ## Acceptance Criteria
 
@@ -23,6 +23,8 @@
 - A dedicated recovery workflow checks out and validates an existing release
   tag before publishing its image, without creating or altering that release.
 - `markcallen/cached-yfinance:v0.2.1` becomes pullable by the MCA CronJob.
+- The non-root collector user can execute `uv run` without modifying a
+  root-owned virtual-environment file.
 
 ## Test Strategy
 
@@ -40,7 +42,9 @@
 - [x] Diagnose the ImagePullBackOff as a missing Docker Hub tag.
 - [x] Add release-workflow retry/tagging regression coverage.
 - [x] Add and pass existing-release image publisher regression coverage plus full local validation.
-- [ ] Merge the workflow repair, publish `v0.2.1`, and verify the Job.
+- [x] Publish the missing `v0.2.1` tag and prove the image pulls.
+- [x] Repair the non-root uv environment and pass local container/full-suite validation.
+- [ ] Cut the patch release and verify the Job retrieves data.
 
 # Task: Direct S3 collector storage and bounded option-history retention
 

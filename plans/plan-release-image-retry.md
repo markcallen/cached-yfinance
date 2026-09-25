@@ -18,12 +18,17 @@ release retry detect an existing GitHub Release and skip only duplicate release
 and asset creation, allowing it to build and publish the missing image. Because
 a subsequent `main` commit must not recreate an older release, add a separate,
 tag-validated recovery workflow that only publishes an existing release image.
+The `v0.2.1` verification Job then exposed a separate non-root image defect:
+the runtime user cannot update uv's editable-install file. Correct the image
+ownership before cutting the next patch release.
 
 ## Files Affected
 
 - `.github/workflows/release.yml` - tag manual images and allow a publish retry.
 - `.github/workflows/publish-existing-release-image.yml` - publish a validated
   existing release image without changing the GitHub Release.
+- `Dockerfile` - give the non-root runtime user ownership of the uv environment.
+- `tests/test_dockerfile.py` - preserve the image ownership contract.
 - `tests/test_workflows.py` - regression assertions for the release contract.
 - `PRD.md` - define the image publishing/retry acceptance criteria.
 
@@ -32,7 +37,7 @@ tag-validated recovery workflow that only publishes an existing release image.
 - [x] Phase 1: Diagnose missing v0.2.1 Docker tag.
 - [x] Phase 2: Implement explicit version tag and release-exists gate.
 - [x] Phase 3: Implement and validate the existing-tag recovery publisher.
-- [ ] Phase 4: Document outcome and graduate the plan.
+- [ ] Phase 4: Repair the non-root image, release the patch, verify the Job, and graduate the plan.
 
 ## Verification
 
@@ -57,3 +62,4 @@ None.
 | --- | --- |
 | 2026-09-25 | Plan created after production image-pull diagnosis. |
 | 2026-09-25 | Added a recovery workflow after confirming that a new `main` commit must not rerun the older release as the next patch version. |
+| 2026-09-25 | Expanded scope after the recovered v0.2.1 image exposed root-owned `.venv` files at runtime. |

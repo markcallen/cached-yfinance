@@ -11,3 +11,6 @@
   `workflow_dispatch` run on `main`. Manual releases must pass their validated
   release tag explicitly, and their retry path must avoid duplicate GitHub
   Release creation without skipping image publication.
+- Container builds that create a project virtual environment as root must chown
+  it before switching to a non-root runtime user when `uv run` can reconcile an
+  editable install at process start.

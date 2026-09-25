@@ -18,7 +18,7 @@ RUN uv sync --frozen --extra s3
 
 RUN mkdir -p /cache /tmp/uv-cache \
     && chmod +x ./scripts/entrypoint.sh ./scripts/download_data.sh \
-    && chown -R 1000:1000 /app/cached_yfinance /app/tools /app/scripts /cache /tmp/uv-cache
+    && chown -R 1000:1000 /app/.venv /app/cached_yfinance /app/tools /app/scripts /cache /tmp/uv-cache
 
 ENV TICKER=""
 ENV INTERVAL="1d"
