@@ -55,6 +55,42 @@
   pass. The existing LocalStack E2E test was skipped because the sandbox does
   not make Docker available to pytest.
 
+# Task: Make manual release tagging idempotent
+
+## Context
+- Owner: Codex
+- Date: 2026-09-25
+- Mode: Autonomous; user requested a fix for failed Release run 36089875149.
+- PRD Section: `12.1.1 PyPI Release`
+- Requirement IDs: REL-VERSION-1
+
+## Scope
+- In scope: prevent a no-op version bump from failing before its missing release tag can be created.
+- Out of scope: publishing credentials, release assets, and package runtime behavior.
+
+## Acceptance Criteria
+- A manual release creates a missing matching tag when the package version is already correct.
+- A rerun reuses an existing tag only when it resolves to the intended commit.
+- A conflicting existing tag fails before pushing a release.
+
+## Execution Checklist
+- [x] Diagnose the failed release log and confirm the missing tag.
+- [x] Add workflow regression coverage for the idempotent release path.
+- [x] Update release tagging and run relevant validation.
+
+## Test Strategy
+- Unit: `uv run pytest -o addopts= tests/test_workflows.py`.
+- Failure-path tests: static workflow assertions require a conflicting-tag failure branch.
+
+## Rollback Strategy
+- Trigger: a legitimate manual release is blocked.
+- Rollback steps: revert the release workflow and its regression test together.
+
+## Outcome
+- Result: Complete. Manual releases now tolerate an already-correct package version, create the missing tag, reuse a tag whose release commit was created from the original workflow commit, and reject ambiguous or conflicting tag state.
+- Evidence links/commands: `uv run pytest -o addopts= tests/test_workflows.py`, `uv run pytest -o addopts=`, `uv run ruff check .`, `uv run black --check .`, `uv run mypy cached_yfinance`, `bash -n scripts/find_retry_release_tag.sh`, `git diff --check`.
+- PRD updates: Expanded REL-VERSION-1 with safe manual-release rerun behavior.
+
 # Task: Resolve GitHub Issues 6 and 7
 
 ## Context
