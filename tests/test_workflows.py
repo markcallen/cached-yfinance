@@ -123,6 +123,20 @@ def test_manual_release_publishes_versioned_image_and_can_retry() -> None:
     assert "gh release view" in workflow
 
 
+def test_existing_release_image_workflow_validates_and_publishes_tag() -> None:
+    """REL-VERSION-1: existing releases can publish their immutable image."""
+    workflow = _read_workflow(".github/workflows/publish-existing-release-image.yml")
+
+    assert "workflow_dispatch:" in workflow
+    assert "ref: refs/tags/${{ inputs.tag }}" in workflow
+    assert "Invalid release tag" in workflow
+    assert "does not match pyproject.toml version" in workflow
+    assert "type=raw,value=${{ steps.version.outputs.tag }}" in workflow
+    assert "type=raw,value=${{ steps.version.outputs.sha_tag }}" in workflow
+    assert "docker/login-action@v4" in workflow
+    assert "docker/build-push-action@v7" in workflow
+
+
 def test_retry_tag_finder_reuses_the_tag_created_from_the_original_commit(
     tmp_path: Path,
 ) -> None:

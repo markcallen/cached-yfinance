@@ -20,6 +20,8 @@
 
 - A manually dispatched release supplies `v<version>` to Docker metadata.
 - An existing GitHub Release prevents only duplicate release/assets, not image publishing.
+- A dedicated recovery workflow checks out and validates an existing release
+  tag before publishing its image, without creating or altering that release.
 - `markcallen/cached-yfinance:v0.2.1` becomes pullable by the MCA CronJob.
 
 ## Test Strategy
@@ -37,7 +39,7 @@
 
 - [x] Diagnose the ImagePullBackOff as a missing Docker Hub tag.
 - [x] Add release-workflow retry/tagging regression coverage.
-- [x] Add and pass workflow tagging/retry regression coverage plus full local validation.
+- [x] Add and pass existing-release image publisher regression coverage plus full local validation.
 - [ ] Merge the workflow repair, publish `v0.2.1`, and verify the Job.
 
 # Task: Direct S3 collector storage and bounded option-history retention

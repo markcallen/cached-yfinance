@@ -15,11 +15,15 @@ ref for a manual dispatch, so its tag-event rules produce no version tag.
 
 Add the validated release tag as an explicit Docker metadata tag. Make a
 release retry detect an existing GitHub Release and skip only duplicate release
-and asset creation, allowing it to build and publish the missing image.
+and asset creation, allowing it to build and publish the missing image. Because
+a subsequent `main` commit must not recreate an older release, add a separate,
+tag-validated recovery workflow that only publishes an existing release image.
 
 ## Files Affected
 
 - `.github/workflows/release.yml` - tag manual images and allow a publish retry.
+- `.github/workflows/publish-existing-release-image.yml` - publish a validated
+  existing release image without changing the GitHub Release.
 - `tests/test_workflows.py` - regression assertions for the release contract.
 - `PRD.md` - define the image publishing/retry acceptance criteria.
 
@@ -27,7 +31,7 @@ and asset creation, allowing it to build and publish the missing image.
 
 - [x] Phase 1: Diagnose missing v0.2.1 Docker tag.
 - [x] Phase 2: Implement explicit version tag and release-exists gate.
-- [x] Phase 3: Validate the workflow repair locally; publish and production Job verification remain pending merge.
+- [x] Phase 3: Implement and validate the existing-tag recovery publisher.
 - [ ] Phase 4: Document outcome and graduate the plan.
 
 ## Verification
@@ -52,3 +56,4 @@ None.
 | Date | Change |
 | --- | --- |
 | 2026-09-25 | Plan created after production image-pull diagnosis. |
+| 2026-09-25 | Added a recovery workflow after confirming that a new `main` commit must not rerun the older release as the next patch version. |
