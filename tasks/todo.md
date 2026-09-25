@@ -25,7 +25,7 @@
 - `markcallen/cached-yfinance:v0.2.1` becomes pullable by the MCA CronJob.
 - The non-root collector user can execute `uv run` without modifying a
   root-owned virtual-environment file.
-- S3 retention deletes expired objects in batches of no more than 1,000 keys.
+- The collector never deletes option-history objects automatically.
 
 ## Test Strategy
 
@@ -46,7 +46,8 @@
 - [x] Publish the missing `v0.2.1` tag and prove the image pulls.
 - [x] Repair the non-root uv environment and pass local container/full-suite validation.
 - [x] Add batch-delete retention regression coverage and pass full local validation.
-- [ ] Cut the patch release and verify the Job retrieves data within its deadline.
+- [x] Stop automatic option-history pruning after data-retention requirements changed.
+- [ ] Release the preservation change, restore versioned snapshots, and resume collection.
 
 # Task: Direct S3 collector storage and bounded option-history retention
 

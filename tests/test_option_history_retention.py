@@ -1,3 +1,4 @@
+import inspect
 from datetime import date
 
 import pandas as pd
@@ -125,3 +126,8 @@ def test_collector_selects_direct_s3_cache(monkeypatch) -> None:
         "endpoint_url": "https://objects.example.com",
         "region_name": "us-east-1",
     }
+
+
+def test_collector_does_not_automatically_prune_option_history() -> None:
+    """Option history is retained unless an operator explicitly removes it."""
+    assert "prune_option_history" not in inspect.getsource(options_collector.main)

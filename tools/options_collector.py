@@ -56,7 +56,6 @@ DEFAULT_CONFIG = {
     "market_open": "09:30",
     "market_close": "16:00",
     "max_expirations": 5,  # Limit to nearest 5 expirations to avoid too much data
-    "retention_days": None,
     "s3_bucket": None,
     "s3_prefix": "",
     "s3_endpoint_url": None,
@@ -343,15 +342,6 @@ Cron example (every 15 minutes during market hours):
         if stats["success"]:
             successful_tickers += 1
             total_contracts += stats["total_contracts"]
-            retention_days = config.get("retention_days")
-            if retention_days is not None:
-                deleted = cache.prune_option_history(ticker, int(retention_days))
-                if deleted:
-                    logger.info(
-                        "%s: removed %s expired option cache objects",
-                        ticker,
-                        deleted,
-                    )
         else:
             logger.error(f"{ticker}: {stats['error']}")
 
