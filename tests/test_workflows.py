@@ -113,6 +113,16 @@ def test_issue_7_release_validates_versions_before_build() -> None:
     assert "does not match pyproject.toml version" in version_step
 
 
+def test_manual_release_publishes_versioned_image_and_can_retry() -> None:
+    """REL-VERSION-1: manual retries publish the image without duplicating releases."""
+    workflow = _read_workflow(".github/workflows/release.yml")
+
+    assert "type=raw,value=${{ steps.version.outputs.tag }}" in workflow
+    assert "Check whether release exists" in workflow
+    assert "steps.release_exists.outputs.exists != 'true'" in workflow
+    assert "gh release view" in workflow
+
+
 def test_retry_tag_finder_reuses_the_tag_created_from_the_original_commit(
     tmp_path: Path,
 ) -> None:
