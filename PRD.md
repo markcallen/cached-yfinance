@@ -219,9 +219,9 @@ for symbol in ["SPY", "QQQ", "IWM"]:
   archive to local disk.
 - **Retrieval Compatibility:** Direct-S3 snapshots retain the existing cache
   key layout and remain readable through `S3Cache`.
-- **Retention:** Callers may set a retention period for timestamped option
-  snapshots. Pruning removes only snapshots older than that period, never
-  current or future snapshots.
+- **Retention:** The collector preserves timestamped option snapshots
+  indefinitely. Deletion or retention policies are explicit operator actions;
+  the collector never prunes option-history objects automatically.
 
 ### 5.2 Performance Requirements
 
