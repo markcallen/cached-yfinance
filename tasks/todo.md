@@ -1,3 +1,45 @@
+# Task: Repair manual release image publishing
+
+## Context
+
+- Owner: Codex
+- Date: 2026-09-25
+- Mode: Approval-Required; the user requested the production job be fixed.
+- PRD Section: 12.1.1 PyPI Release
+- Requirement IDs: REL-VERSION-1
+
+## Scope
+
+- Publish the released `v0.2.1` collector image through the repository release
+  workflow rather than bypassing registry controls.
+- Ensure future manual releases publish their immutable version tag and allow
+  a safe retry if the GitHub Release already exists.
+- Out of scope: changing the public registry, credentials, or image contents.
+
+## Acceptance Criteria
+
+- A manually dispatched release supplies `v<version>` to Docker metadata.
+- An existing GitHub Release prevents only duplicate release/assets, not image publishing.
+- `markcallen/cached-yfinance:v0.2.1` becomes pullable by the MCA CronJob.
+
+## Test Strategy
+
+- Regression: workflow test asserts the explicit tag and release-exists branch.
+- Integration: merge the workflow repair, dispatch the existing patch release,
+  and run a one-off Job from the production CronJob.
+
+## Rollback Strategy
+
+- Revert the workflow repair. The pre-existing release remains available and
+  the CronJob can be rolled back to the last pullable image in GitOps.
+
+## Execution Checklist
+
+- [x] Diagnose the ImagePullBackOff as a missing Docker Hub tag.
+- [x] Add release-workflow retry/tagging regression coverage.
+- [x] Add and pass workflow tagging/retry regression coverage plus full local validation.
+- [ ] Merge the workflow repair, publish `v0.2.1`, and verify the Job.
+
 # Task: Direct S3 collector storage and bounded option-history retention
 
 ## Context

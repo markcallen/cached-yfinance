@@ -7,3 +7,7 @@
   observe a tag created by its prior attempt. Detect tags whose release commit
   has that SHA as its parent before calculating a new SemVer; cover this with
   temporary Git repositories rather than only checking workflow text.
+- `docker/metadata-action` tag-event rules do not infer a SemVer tag for a
+  `workflow_dispatch` run on `main`. Manual releases must pass their validated
+  release tag explicitly, and their retry path must avoid duplicate GitHub
+  Release creation without skipping image publication.
