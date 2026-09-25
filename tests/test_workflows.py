@@ -2,6 +2,7 @@
 
 import re
 import subprocess
+from os import environ
 from pathlib import Path
 
 
@@ -12,6 +13,14 @@ def _read_workflow(path: str) -> str:
     return (REPO_ROOT / path).read_text(encoding="utf-8")
 
 
+def _git_environment() -> dict[str, str]:
+    environment = {
+        name: value for name, value in environ.items() if not name.startswith("GIT_")
+    }
+    environment["PRE_COMMIT_ALLOW_NO_CONFIG"] = "1"
+    return environment
+
+
 def _git(repo: Path, *args: str) -> str:
     return subprocess.run(
         ["git", *args],
@@ -19,6 +28,7 @@ def _git(repo: Path, *args: str) -> str:
         check=True,
         capture_output=True,
         text=True,
+        env=_git_environment(),
     ).stdout.strip()
 
 
@@ -35,6 +45,7 @@ def _run_retry_tag_finder(
         cwd=repo,
         capture_output=True,
         text=True,
+        env=_git_environment(),
     )
 
 
@@ -105,7 +116,7 @@ def test_issue_7_release_validates_versions_before_build() -> None:
 def test_retry_tag_finder_reuses_the_tag_created_from_the_original_commit(
     tmp_path: Path,
 ) -> None:
-    _git(tmp_path, "init")
+    _git(tmp_path, "init", "--template=/dev/null")
     _git(tmp_path, "config", "user.name", "Test User")
     _git(tmp_path, "config", "user.email", "test@example.com")
     base_commit = _commit(tmp_path, "base")
@@ -121,7 +132,7 @@ def test_retry_tag_finder_reuses_the_tag_created_from_the_original_commit(
 def test_retry_tag_finder_returns_nothing_when_no_retry_tag_exists(
     tmp_path: Path,
 ) -> None:
-    _git(tmp_path, "init")
+    _git(tmp_path, "init", "--template=/dev/null")
     _git(tmp_path, "config", "user.name", "Test User")
     _git(tmp_path, "config", "user.email", "test@example.com")
     base_commit = _commit(tmp_path, "base")
@@ -135,7 +146,7 @@ def test_retry_tag_finder_returns_nothing_when_no_retry_tag_exists(
 def test_retry_tag_finder_rejects_multiple_release_tags_for_one_base_commit(
     tmp_path: Path,
 ) -> None:
-    _git(tmp_path, "init")
+    _git(tmp_path, "init", "--template=/dev/null")
     _git(tmp_path, "config", "user.name", "Test User")
     _git(tmp_path, "config", "user.email", "test@example.com")
     base_commit = _commit(tmp_path, "base")
