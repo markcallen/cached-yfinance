@@ -21,6 +21,9 @@ tag-validated recovery workflow that only publishes an existing release image.
 The `v0.2.1` verification Job then exposed a separate non-root image defect:
 the runtime user cannot update uv's editable-install file. Correct the image
 ownership before cutting the next patch release.
+The first successful forced retrieval also showed that serial deletion of the
+legacy history delays the next ticker; batch S3 deletes are required to keep
+the retention policy operational at the existing object count.
 
 ## Files Affected
 
@@ -29,6 +32,8 @@ ownership before cutting the next patch release.
   existing release image without changing the GitHub Release.
 - `Dockerfile` - give the non-root runtime user ownership of the uv environment.
 - `tests/test_dockerfile.py` - preserve the image ownership contract.
+- `cached_yfinance/s3_cache.py` - batch expired S3 deletes at the API limit.
+- `tests/test_option_history_retention.py` - prove batch size and cutoff behavior.
 - `tests/test_workflows.py` - regression assertions for the release contract.
 - `PRD.md` - define the image publishing/retry acceptance criteria.
 
@@ -37,7 +42,7 @@ ownership before cutting the next patch release.
 - [x] Phase 1: Diagnose missing v0.2.1 Docker tag.
 - [x] Phase 2: Implement explicit version tag and release-exists gate.
 - [x] Phase 3: Implement and validate the existing-tag recovery publisher.
-- [ ] Phase 4: Repair the non-root image, release the patch, verify the Job, and graduate the plan.
+- [ ] Phase 4: Batch S3 retention cleanup, release the patch, verify the Job, and graduate the plan.
 
 ## Verification
 
@@ -63,3 +68,4 @@ None.
 | 2026-09-25 | Plan created after production image-pull diagnosis. |
 | 2026-09-25 | Added a recovery workflow after confirming that a new `main` commit must not rerun the older release as the next patch version. |
 | 2026-09-25 | Expanded scope after the recovered v0.2.1 image exposed root-owned `.venv` files at runtime. |
+| 2026-09-25 | Added batched retention deletes after the first direct-S3 run spent its interval cleaning legacy objects serially. |

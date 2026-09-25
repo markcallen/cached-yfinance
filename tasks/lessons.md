@@ -14,3 +14,6 @@
 - Container builds that create a project virtual environment as root must chown
   it before switching to a non-root runtime user when `uv run` can reconcile an
   editable install at process start.
+- A one-time retention cleanup can contain thousands of S3 objects; issue
+  `DeleteObjects` requests in batches of at most 1,000 rather than one network
+  request per object.
