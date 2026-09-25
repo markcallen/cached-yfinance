@@ -1,3 +1,60 @@
+# Task: Direct S3 collector storage and bounded option-history retention
+
+## Context
+
+- Owner: Codex
+- Date: 2026-09-25
+- Mode: Approval-Required; user approved the recommended direct-S3 design.
+- PRD Section: 5.1.5 Managed S3 Options History
+
+## Scope
+
+- Add direct S3 configuration to the options collector and package S3 support
+  in the collector image.
+- Add tested, opt-in pruning of timestamped option snapshots for filesystem
+  and S3 caches.
+- Preserve the existing S3 key layout and all non-expired retrieval behavior.
+- Out of scope: deleting pre-existing production history before the new
+  release is deployed, publishing the release image, and applying GitOps.
+
+## Acceptance Criteria
+
+- A configured collector instantiates `S3Cache` directly and does not require
+  a local restored cache.
+- S3 option snapshots remain readable at their existing object keys.
+- Retention deletes only objects dated strictly before the configured cutoff.
+- The collector image installs the optional S3 dependency.
+
+## Test Strategy
+
+- Unit: add filesystem and fake-S3 retention regression tests.
+- Integration: build the image and render the GitOps chart against the new
+  collector flags.
+- Failure path: invalid retention values are rejected and no newer snapshot is
+  removed.
+
+## Rollback Strategy
+
+- Revert the package release and keep the existing filesystem collector image;
+  direct-S3 objects remain in the same layout and are not mutated by rollback.
+
+## Execution Checklist
+
+- [x] Add failing retention regression tests.
+- [x] Implement direct-S3 collector selection and cache pruning.
+- [x] Build with the S3 extra, run lint/type/tests, and record evidence.
+
+## Outcome
+
+- Added direct `S3Cache` selection through collector configuration, preserving
+  the existing S3 object layout.
+- Added opt-in retention for timestamped option snapshots in filesystem and
+  S3 caches. The MCA chart configures 30 days.
+- Evidence: focused regression tests pass; the non-Docker test suite passes
+  130 tests; lint, format, typing, Docker build, and an in-image S3 import
+  pass. The existing LocalStack E2E test was skipped because the sandbox does
+  not make Docker available to pytest.
+
 # Task: Resolve GitHub Issues 6 and 7
 
 ## Context

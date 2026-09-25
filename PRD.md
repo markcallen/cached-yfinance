@@ -212,6 +212,17 @@ for symbol in ["SPY", "QQQ", "IWM"]:
 - **Size Optimization:** Compressed storage, efficient data types
 - **Cache Inspection:** Tools to view cached data and statistics
 
+#### 5.1.5 Managed S3 Options History
+
+- **S3 Collector Storage:** The market-hours collector can write option snapshots
+  directly to an S3-compatible cache without first restoring the complete
+  archive to local disk.
+- **Retrieval Compatibility:** Direct-S3 snapshots retain the existing cache
+  key layout and remain readable through `S3Cache`.
+- **Retention:** Callers may set a retention period for timestamped option
+  snapshots. Pruning removes only snapshots older than that period, never
+  current or future snapshots.
+
 ### 5.2 Performance Requirements
 
 #### 5.2.1 Speed Improvements

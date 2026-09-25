@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 from dataclasses import dataclass
 from datetime import date, datetime
 from pathlib import Path
@@ -244,6 +245,41 @@ class FileSystemCache:
         meta_path = self._option_meta_path(symbol, expiration_date, timestamp)
         with open(meta_path, "w", encoding="utf-8") as f:
             json.dump(meta, f, indent=2)
+
+    def prune_option_history(
+        self, symbol: str, retention_days: int, *, today: Optional[date] = None
+    ) -> int:
+        """Remove timestamped option snapshots older than ``retention_days``.
+
+        Current and future snapshots are retained. Non-timestamped option cache
+        entries are intentionally outside this policy.
+        """
+        if retention_days <= 0:
+            raise ValueError("retention_days must be greater than zero")
+
+        cutoff = (today or date.today()) - pd.Timedelta(days=retention_days)
+        historical_dir = self.root / _sanitize_symbol(symbol) / "options"
+        deleted = 0
+        if not historical_dir.exists():
+            return deleted
+
+        for date_dir in historical_dir.glob("*/historical/*"):
+            if not date_dir.is_dir():
+                continue
+            try:
+                snapshot_date = datetime.strptime(date_dir.name, "%Y-%m-%d").date()
+            except ValueError:
+                continue
+            if snapshot_date >= cutoff:
+                continue
+            for entry in date_dir.iterdir():
+                if entry.is_dir():
+                    shutil.rmtree(entry)
+                else:
+                    entry.unlink()
+                deleted += 1
+            date_dir.rmdir()
+        return deleted
 
     def iter_cached_days(self, symbol: str, interval: str) -> Iterable[date]:
         sym_dir = self.root / _sanitize_symbol(symbol) / interval

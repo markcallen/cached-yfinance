@@ -242,6 +242,31 @@ class S3Cache(FileSystemCache):
             "application/json",
         )
 
+    def prune_option_history(
+        self, symbol: str, retention_days: int, *, today: Optional[date] = None
+    ) -> int:
+        """Remove expired timestamped option snapshots from object storage."""
+        if retention_days <= 0:
+            raise ValueError("retention_days must be greater than zero")
+
+        cutoff = (today or date.today()) - pd.Timedelta(days=retention_days)
+        prefix = self._key(_sanitize_symbol(symbol), "options") + "/"
+        expired_keys: list[str] = []
+        for object_key in self._list_keys(prefix):
+            parts = object_key[len(prefix) :].split("/")
+            if len(parts) < 4 or parts[1] != "historical":
+                continue
+            try:
+                snapshot_date = datetime.strptime(parts[2], "%Y-%m-%d").date()
+            except ValueError:
+                continue
+            if snapshot_date < cutoff:
+                expired_keys.append(object_key)
+
+        for object_key in expired_keys:
+            self.s3.delete_object(Bucket=self.bucket, Key=object_key)
+        return len(expired_keys)
+
     def iter_cached_days(self, symbol: str, interval: str) -> Iterable[date]:
         prefix = self._key(_sanitize_symbol(symbol), interval) + "/"
         seen: set[date] = set()
