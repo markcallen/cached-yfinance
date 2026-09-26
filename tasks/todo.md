@@ -49,6 +49,68 @@
 - [x] Stop automatic option-history pruning after data-retention requirements changed.
 - [ ] Release the preservation change, restore versioned snapshots, and resume collection.
 
+# Task: S3-backed hourly intraday price collector
+
+## Context
+
+- Owner: Codex
+- Date: 2026-09-26
+- Mode: Approval-Required; user requested an independent hourly price job.
+- PRD Section: 5.1.6 Managed S3 Intraday Price Collection
+
+## Scope
+
+- Make `ticker_collector.py` select `S3Cache` from collector configuration.
+- Refresh current-session one-minute bars on every intraday collection.
+- Add the independent MCA Helm CronJob for IWM, AMZN, NVDA, AAPL, and SPCX.
+- Update the collector documentation and example configuration.
+
+## Acceptance Criteria
+
+- The price collector accepts the same S3 fields as the options collector.
+- One-minute collection fetches the current session directly on each run and
+  writes the established daily S3 Parquet and metadata keys.
+- The rendered MCA chart contains a distinct hourly `America/New_York` price
+  CronJob and retains the 15-minute options collector.
+
+## Constraints
+
+- Do not modify the established cache key layout or include credentials in
+  ConfigMaps.
+- Keep price and option workloads independently retryable.
+
+## Risks and Tradeoffs
+
+- Yahoo retains intraday data for a limited period; hourly refresh favors a
+  complete current session over re-downloading an arbitrary historical window.
+
+## Execution Checklist
+
+- [x] Confirm the existing ticker collector is filesystem-only and the options
+  collector already supports direct S3.
+- [x] Add failing S3-selection and fresh-session tests.
+- [x] Implement direct S3 selection and current-session refresh.
+- [x] Add the separate hourly Helm CronJob and production values.
+- [x] Update documentation and validate code, image, and chart rendering.
+
+## Test Strategy
+
+- Unit: fake-S3 constructor capture and deterministic fake-client download
+  assertions.
+- Integration: production Helm rendering exposes both jobs with direct-S3
+  configuration.
+- Failure path: collector retains per-ticker error isolation.
+
+## Rollback Strategy
+
+- Revert the collector image and remove the price CronJob; pre-existing option
+  collection and S3 objects are unchanged.
+
+## Outcome
+
+- Result: Implementation and local validation complete. Production activation
+  waits for a published immutable collector image containing this change.
+
 # Task: Direct S3 collector storage and bounded option-history retention
 
 ## Context

@@ -57,3 +57,29 @@ client.get_option_chain("IWM", "2026-09-18", use_cache=False)
 ```
 
 The timestamped objects remain available for later analysis through `iter_cached_option_timestamps()` and `get_option_chain(..., timestamp=...)`.
+
+## Automated one-minute price collection
+
+`tools/ticker_collector.py` accepts the same S3 settings as the options
+collector. This configuration writes daily one-minute IWM price objects below
+`yfinance/IWM/1m/YYYY/MM/`:
+
+```json
+{
+  "tickers": ["IWM"],
+  "interval": "1m",
+  "s3_bucket": "market-data",
+  "s3_prefix": "yfinance",
+  "s3_region": "us-east-1"
+}
+```
+
+Run it with:
+
+```bash
+python tools/ticker_collector.py --config ticker_collector_config.json
+```
+
+For `1m` data, each execution requests `period="1d"` from Yahoo Finance and
+replaces the current day's object. Schedule it during market hours to keep the
+intraday session current; older daily objects remain unchanged.

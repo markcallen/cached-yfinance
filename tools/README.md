@@ -127,8 +127,12 @@ python ticker_collector.py --cache-dir ~/my_ticker_cache
   "timezone": "America/New_York",
   "market_open": "09:30",
   "market_close": "16:00",
-  "days": 30,
-  "interval": "1m"
+  "days": 1,
+  "interval": "1m",
+  "s3_bucket": "market-data",
+  "s3_prefix": "cached-yfinance",
+  "s3_endpoint_url": null,
+  "s3_region": "us-east-1"
 }
 ```
 
@@ -142,6 +146,14 @@ python ticker_collector.py --cache-dir ~/my_ticker_cache
 - ✅ **Dry run mode** for testing configurations
 - ✅ **Multiple timezone support** for different markets
 - ✅ **Progress tracking** with summary statistics
+- ✅ **Direct S3/compatible-object-storage support** using the same
+  configuration fields as `options_collector.py`
+- ✅ **Current-session one-minute refreshes** that replace the current day's
+  cached Parquet object rather than retaining an initial partial session
+
+For `interval: "1m"`, the collector refreshes Yahoo's current-session
+`period="1d"` response on each run. The `days` setting applies to non-1m
+intervals; Yahoo retains intraday history for less than 30 days.
 
 ### 4. `options_collector.py` - Automated Options Data Collection
 

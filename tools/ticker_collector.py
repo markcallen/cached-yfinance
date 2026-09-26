@@ -45,7 +45,7 @@ import pandas as pd
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import cached_yfinance as cyf
-from cached_yfinance import FileSystemCache
+from cached_yfinance import FileSystemCache, S3Cache
 
 
 # Default configuration
@@ -56,8 +56,12 @@ DEFAULT_CONFIG = {
     "timezone": "America/New_York",
     "market_open": "09:30",
     "market_close": "16:00",
-    "days": 7,  # Number of days to download (Yahoo Finance limits 1m data to <30 days)
+    "days": 7,  # Used by non-1m intervals; 1m always refreshes the current session
     "interval": "1m",  # Data interval (1m, 5m, 15m, 30m, 1h, 1d, etc.)
+    "s3_bucket": None,
+    "s3_prefix": "",
+    "s3_endpoint_url": None,
+    "s3_region": None,
 }
 
 
@@ -111,6 +115,21 @@ def load_config(config_file: Optional[str] = None) -> Dict:
     return config
 
 
+def create_cache(config: Dict) -> FileSystemCache:
+    """Create the configured cache backend for a collector run."""
+    bucket = config.get("s3_bucket")
+    if bucket:
+        return S3Cache(
+            bucket,
+            prefix=config.get("s3_prefix", ""),
+            endpoint_url=config.get("s3_endpoint_url") or None,
+            region_name=config.get("s3_region"),
+        )
+    if config["cache_dir"]:
+        return FileSystemCache(config["cache_dir"])
+    return FileSystemCache()
+
+
 def collect_1m_data(
     ticker: str,
     client: cyf.CachedYFClient,
@@ -150,23 +169,34 @@ def collect_1m_data(
             )
             adjusted_days = 29
 
-        # Calculate date range
-        end_date = datetime.now()
-        start_date = end_date - timedelta(days=adjusted_days)
+        # A current-day intraday cache needs a fresh upstream response on every
+        # run. Supplying only a period bypasses the per-day cache lookup, then
+        # overwrites today's Parquet object with the latest complete session.
+        if interval == "1m":
+            logger.info(f"{ticker}: Refreshing current 1m trading session")
+            data = client.download(
+                ticker.upper(),
+                period="1d",
+                interval=interval,
+                progress=False,
+            )
+        else:
+            # Calculate date range
+            end_date = datetime.now()
+            start_date = end_date - timedelta(days=adjusted_days)
 
-        logger.info(
-            f"{ticker}: Downloading {interval} data from {start_date.strftime('%Y-%m-%d')} "
-            f"to {end_date.strftime('%Y-%m-%d')}"
-        )
+            logger.info(
+                f"{ticker}: Downloading {interval} data from {start_date.strftime('%Y-%m-%d')} "
+                f"to {end_date.strftime('%Y-%m-%d')}"
+            )
 
-        # Download the data
-        data = client.download(
-            ticker.upper(),
-            start=start_date,
-            end=end_date,
-            interval=interval,
-            progress=False,
-        )
+            data = client.download(
+                ticker.upper(),
+                start=start_date,
+                end=end_date,
+                interval=interval,
+                progress=False,
+            )
 
         if data.empty:
             stats["error"] = "No data returned"
@@ -265,18 +295,16 @@ Cron example (daily at 5:00 PM EST after market close):
         logger.info("DRY RUN - No data will be downloaded")
         for ticker in config["tickers"]:
             interval = config.get("interval", "1m")
-            logger.info(
-                f"Would collect {interval} data for {ticker} (last {config['days']} days)"
+            window = (
+                "current session" if interval == "1m" else f"last {config['days']} days"
             )
+            logger.info(f"Would collect {interval} data for {ticker} ({window})")
         return
 
     # Initialize client
     try:
-        if config["cache_dir"]:
-            cache = FileSystemCache(config["cache_dir"])
-            client = cyf.CachedYFClient(cache)
-        else:
-            client = cyf.CachedYFClient()
+        cache = create_cache(config)
+        client = cyf.CachedYFClient(cache)
     except Exception as e:
         logger.error(f"Failed to initialize client: {e}")
         sys.exit(1)
