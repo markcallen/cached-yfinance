@@ -167,9 +167,11 @@ class TestUtilityFunctions:
     def test_normalize_range_intraday_default_end(self) -> None:
         """Test _normalize_range with intraday interval and no end."""
         with patch("pandas.Timestamp.utcnow") as mock_now:
-            mock_now.return_value = pd.Timestamp("2023-01-15 15:30:00")
+            mock_now.return_value = pd.Timestamp("2023-01-15 15:30:00", tz="UTC")
             start_ts, end_ts = _normalize_range(None, None, "5d", "5m")
             assert end_ts == pd.Timestamp("2023-01-15 15:30:00")
+            assert start_ts == pd.Timestamp("2023-01-10 15:30:00")
+            assert end_ts.tz is None
 
     def test_normalize_range_daily_default_end(self) -> None:
         """Test _normalize_range with daily interval and no end."""
