@@ -99,11 +99,16 @@ def _normalize_range(
     start_ts = _parse_timestamp(start)
 
     if end_ts is None:
-        end_ts = (
-            pd.Timestamp.utcnow()
-            if any(interval.endswith(s) for s in ("m", "h"))
-            else pd.Timestamp.today().normalize()
-        )
+        if any(interval.endswith(s) for s in ("m", "h")):
+            # `Timestamp.utcnow()` is timezone-aware in newer pandas releases,
+            # whereas the rest of the cache range logic uses naive timestamps.
+            # Keep the internal range consistently naive UTC so that period-based
+            # intraday requests can be compared to `Timestamp.now()` safely.
+            end_ts = pd.Timestamp.utcnow()
+            if end_ts.tz is not None:
+                end_ts = end_ts.tz_localize(None)
+        else:
+            end_ts = pd.Timestamp.today().normalize()
 
     if start_ts is None and period:
         delta = _parse_period_to_timedelta(period)
