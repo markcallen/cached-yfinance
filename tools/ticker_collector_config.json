@@ -14,6 +14,10 @@
   "timezone": "America/New_York",
   "market_open": "09:30",
   "market_close": "16:00",
-  "days": 30,
-  "interval": "1m"
+  "days": 1,
+  "interval": "1m",
+  "s3_bucket": null,
+  "s3_prefix": "",
+  "s3_endpoint_url": null,
+  "s3_region": null
 }

@@ -223,6 +223,18 @@ for symbol in ["SPY", "QQQ", "IWM"]:
   indefinitely. Deletion or retention policies are explicit operator actions;
   the collector never prunes option-history objects automatically.
 
+#### 5.1.6 Managed S3 Intraday Price Collection
+
+- **S3 Collector Storage:** The dedicated ticker collector can write intraday
+  price data directly to an S3-compatible cache using the same configuration
+  contract as the options collector.
+- **Fresh Intraday Data:** A market-hours collector refreshes the current
+  trading day's one-minute bars on every execution so a cached partial session
+  is never treated as final.
+- **Retrieval Compatibility:** Price data retains the established
+  `symbol/interval/YYYY/MM/YYYY-MM-DD-interval.parquet` and JSON metadata key
+  layout and remains readable through `S3Cache`.
+
 ### 5.2 Performance Requirements
 
 #### 5.2.1 Speed Improvements
