@@ -1,5 +1,8 @@
 # Lessons
 
+- A successful CronJob status does not prove the expected data was written.
+  Validate the returned bar dates and freshness before exiting zero, and
+  avoid treating a cached partial trading day as complete on later runs.
 - A collector that writes timestamped snapshots must own a retention policy.
   Retention must be opt-in for the library, preserve the retrieval key layout,
   and remove only dates strictly older than the configured cutoff.

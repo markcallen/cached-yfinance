@@ -231,6 +231,11 @@ for symbol in ["SPY", "QQQ", "IWM"]:
 - **Fresh Intraday Data:** A market-hours collector refreshes the current
   trading day's one-minute bars on every execution so a cached partial session
   is never treated as final.
+- **Observable Price Freshness:** On an NYSE trading day, a successful price
+  collector run has current-session bars for every configured ticker, with the
+  newest bar no more than 30 minutes behind the earlier of the run time and
+  that session's market close. Missing or stale data makes the process exit
+  nonzero; a non-trading day is logged as a skip.
 - **Retrieval Compatibility:** Price data retains the established
   `symbol/interval/YYYY/MM/YYYY-MM-DD-interval.parquet` and JSON metadata key
   layout and remains readable through `S3Cache`.

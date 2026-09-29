@@ -201,6 +201,22 @@ class CachedYFClient:
             tickers = tickers[0]
 
         tickers = tickers.strip()
+
+        # A current-session one-minute request must refresh the partial day on
+        # every run. Day-level cache hits cannot establish that it is complete.
+        if interval == "1m" and period == "1d" and start is None and end is None:
+            fetched = yf.download(
+                tickers,
+                start=None,
+                end=None,
+                period=period,
+                interval=interval,
+                auto_adjust=False,
+                **kwargs,
+            )
+            self._persist(tickers, interval, fetched)
+            return fetched
+
         req = DownloadRequest(tickers, interval, None, None, kwargs)
         start_ts, end_ts = _normalize_range(start, end, period, interval)
 
@@ -212,10 +228,10 @@ class CachedYFClient:
             now_normalized = now.normalize()
             cutoff_date = now_normalized - pd.Timedelta(days=30)
 
-            # Cap end date to current date if it's in the future
-            # Normalize for consistency with start_ts handling and day-based caching
+            # Cap future ranges at the current instant. Midnight would make
+            # today's intraday fetch an empty range.
             if end_ts.normalize() > now_normalized:
-                end_ts = now_normalized
+                end_ts = now
 
             # Cap start date to current date if it's in the future
             if start_ts.normalize() > now_normalized:
@@ -355,10 +371,9 @@ class CachedYFClient:
                         # Range is entirely outside valid window, skip
                         continue
 
-                # Adjust end date if it's in the future (cap to normalized now)
-                # Normalize for consistency with start date handling and day-based caching
+                # Cap the exclusive end at the current instant, not midnight.
                 if fetch_end_normalized > now_normalized:
-                    fetch_end = now_normalized
+                    fetch_end = now
 
                 # Final check: ensure the adjusted range is valid
                 if fetch_start >= fetch_end:
