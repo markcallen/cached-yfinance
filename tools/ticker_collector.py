@@ -34,11 +34,13 @@ import argparse
 import json
 import logging
 import sys
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Dict, Optional
+from zoneinfo import ZoneInfo
 
 import pandas as pd
+import pandas_market_calendars as mcal
 
 
 # Add the parent directory to the path so we can import cached_yfinance
@@ -130,12 +132,30 @@ def create_cache(config: Dict) -> FileSystemCache:
     return FileSystemCache()
 
 
+def current_nyse_session(
+    now: datetime, timezone: str
+) -> Optional[tuple[date, datetime]]:
+    """Return today's session date and latest acceptable bar time, if open."""
+    local_now = now.astimezone(ZoneInfo(timezone))
+    schedule = mcal.get_calendar("NYSE").schedule(
+        start_date=local_now.date(), end_date=local_now.date()
+    )
+    if schedule.empty:
+        return None
+    market_close = schedule.iloc[0]["market_close"].tz_convert(timezone)
+    cutoff = min(local_now, market_close.to_pydatetime()) - timedelta(minutes=30)
+    return local_now.date(), cutoff
+
+
 def collect_1m_data(
     ticker: str,
     client: cyf.CachedYFClient,
     days: int,
     interval: str,
     logger: logging.Logger,
+    session_date: Optional[date] = None,
+    freshness_cutoff: Optional[datetime] = None,
+    timezone: str = "America/New_York",
 ) -> Dict:
     """
     Collect ticker data for a single ticker.
@@ -203,11 +223,36 @@ def collect_1m_data(
             logger.warning(f"{ticker}: No data found")
             return stats
 
+        if interval == "1m":
+            if session_date is None or freshness_cutoff is None:
+                raise ValueError("Current-session validation requires a session window")
+            if not isinstance(data.index, pd.DatetimeIndex):
+                raise ValueError("One-minute data must have a DatetimeIndex")
+            index = data.index
+            if index.tz is None:
+                index = index.tz_localize("UTC")
+            local_index = index.tz_convert(ZoneInfo(timezone))
+            current_rows = local_index.date == session_date
+            if not current_rows.any():
+                stats["error"] = f"No current session data for {session_date}"
+                return stats
+            local_index = local_index[current_rows]
+            if local_index.max() < freshness_cutoff:
+                stats["error"] = (
+                    f"Stale current session data: newest bar {local_index.max()} "
+                    f"is before {freshness_cutoff}"
+                )
+                return stats
+            data = data.loc[current_rows]
+            display_index = local_index
+        else:
+            display_index = data.index
+
         stats["success"] = True
         stats["data_points"] = len(data)
         stats["date_range"] = (
-            f"{data.index[0].strftime('%Y-%m-%d %H:%M')} to "
-            f"{data.index[-1].strftime('%Y-%m-%d %H:%M')}"
+            f"{display_index[0].strftime('%Y-%m-%d %H:%M')} to "
+            f"{display_index[-1].strftime('%Y-%m-%d %H:%M')}"
         )
 
         logger.info(
@@ -222,7 +267,7 @@ def collect_1m_data(
     return stats
 
 
-def main():
+def main() -> int:
     """Main entry point for the daily 1-minute collector."""
     parser = argparse.ArgumentParser(
         description="Collect 1-minute ticker data daily",
@@ -299,7 +344,18 @@ Cron example (daily at 5:00 PM EST after market close):
                 "current session" if interval == "1m" else f"last {config['days']} days"
             )
             logger.info(f"Would collect {interval} data for {ticker} ({window})")
-        return
+        return 0
+
+    interval = config.get("interval", "1m")
+    session_date = None
+    freshness_cutoff = None
+    if interval == "1m":
+        timezone = config.get("timezone", "America/New_York")
+        session = current_nyse_session(datetime.now(ZoneInfo(timezone)), timezone)
+        if session is None:
+            logger.info("No NYSE trading session today; skipping collection")
+            return 0
+        session_date, freshness_cutoff = session
 
     # Initialize client
     try:
@@ -307,7 +363,7 @@ Cron example (daily at 5:00 PM EST after market close):
         client = cyf.CachedYFClient(cache)
     except Exception as e:
         logger.error(f"Failed to initialize client: {e}")
-        sys.exit(1)
+        return 1
 
     # Collect data for each ticker
     total_tickers = len(config["tickers"])
@@ -318,7 +374,14 @@ Cron example (daily at 5:00 PM EST after market close):
         logger.info(f"[{i}/{total_tickers}] Processing {ticker}...")
 
         stats = collect_1m_data(
-            ticker, client, config["days"], config.get("interval", "1m"), logger
+            ticker,
+            client,
+            config["days"],
+            interval,
+            logger,
+            session_date=session_date,
+            freshness_cutoff=freshness_cutoff,
+            timezone=config.get("timezone", "America/New_York"),
         )
 
         if stats["success"]:
@@ -335,7 +398,8 @@ Cron example (daily at 5:00 PM EST after market close):
     logger.info(f"  Timestamp: {pd.Timestamp.now().isoformat()}")
     logger.info("Daily 1-Minute Ticker Data Collector Complete")
     logger.info("=" * 60)
+    return 0 if successful_tickers == total_tickers else 1
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

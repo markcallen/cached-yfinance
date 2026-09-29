@@ -6,3 +6,4 @@
 | --- | --- | --- |
 | [LocalStack S3 E2E](plan-localstack-s3-e2e.md) | In Progress | `feature/s3-cache` |
 | [S3 Intraday Price Collector](plan-s3-intraday-price-collector.md) | Awaiting image release | `feat/s3-intraday-price-collector` |
+| [Current-session price freshness](plan-current-session-price-freshness.md) | In Progress | `fix/current-session-price-freshness` |

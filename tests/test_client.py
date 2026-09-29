@@ -282,6 +282,67 @@ class TestCachedYFClient:
         client = CachedYFClient(cache)
         assert client.cache == cache
 
+    def test_current_one_minute_period_refreshes_cached_day(
+        self, cache: FileSystemCache
+    ) -> None:
+        """CORE 5.1.6: each current-session run must call upstream."""
+        client = CachedYFClient(cache)
+        key = CacheKey(symbol="IWM", interval="1m", day=date(2026, 9, 29))
+        cached = pd.DataFrame(
+            {"Close": [100.0]},
+            index=pd.DatetimeIndex(["2026-09-29 13:30:00+00:00"]),
+        )
+        fresh = pd.DataFrame(
+            {"Close": [101.0]},
+            index=pd.DatetimeIndex(["2026-09-29 14:30:00+00:00"]),
+        )
+        fresher = pd.DataFrame(
+            {"Close": [102.0]},
+            index=pd.DatetimeIndex(["2026-09-29 15:30:00+00:00"]),
+        )
+        cache.store(key, cached)
+
+        with patch("yfinance.download", side_effect=[fresh, fresher]) as upstream:
+            first = client.download("IWM", period="1d", interval="1m", progress=False)
+            second = client.download("IWM", period="1d", interval="1m", progress=False)
+
+        assert upstream.call_count == 2
+        for call in upstream.call_args_list:
+            assert call.args == ("IWM",)
+            assert call.kwargs == {
+                "start": None,
+                "end": None,
+                "period": "1d",
+                "interval": "1m",
+                "auto_adjust": False,
+                "progress": False,
+            }
+        pd.testing.assert_frame_equal(first, fresh)
+        pd.testing.assert_frame_equal(second, fresher)
+        pd.testing.assert_frame_equal(cache.load(key), fresher)
+
+    @patch("cached_yfinance.client.pd.Timestamp.now")
+    @patch("yfinance.download")
+    def test_missing_current_intraday_day_uses_nonempty_fetch_window(
+        self, upstream: Mock, mock_now: Mock, cache: FileSystemCache
+    ) -> None:
+        """CORE 5.1.6: today's range must end after today's midnight."""
+        mock_now.return_value = pd.Timestamp("2026-09-29 14:30:00")
+        fresh = pd.DataFrame(
+            {"Close": [101.0]},
+            index=pd.DatetimeIndex(["2026-09-29 14:29:00+00:00"]),
+        )
+        upstream.return_value = fresh
+
+        frames = CachedYFClient(cache)._fetch_and_store_missing(
+            "IWM", "1m", [date(2026, 9, 29)], {}
+        )
+
+        upstream.assert_called_once()
+        assert upstream.call_args.kwargs["start"] == pd.Timestamp("2026-09-29")
+        assert upstream.call_args.kwargs["end"] > pd.Timestamp("2026-09-29")
+        assert len(frames) == 1
+
     def test_download_multiple_tickers_error(self, cache: FileSystemCache) -> None:
         """Test download with multiple tickers raises error."""
         client = CachedYFClient(cache)

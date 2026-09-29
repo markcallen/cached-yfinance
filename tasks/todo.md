@@ -1,3 +1,40 @@
+# Task: Repair current-session price collection
+
+## Context
+
+- Owner: Codex
+- Date: 2026-09-29
+- Mode: Approval-Required; the user explicitly requested the source fix and PR.
+- PRD Section: 5.1.6 Managed S3 Intraday Price Collection
+
+## Scope and acceptance criteria
+
+- A one-minute current-session request fetches upstream each run and persists
+  today's data in the existing S3 key layout.
+- A successful trading-day collector run contains sufficiently recent bars for
+  every configured ticker; stale or empty data exits nonzero.
+- A non-trading day is logged and skipped.
+- The options collector and historical cache key layout are unchanged.
+
+## Execution checklist
+
+- [x] Demonstrate the two failure paths with tests that fail on `main`.
+- [x] Fix the client fetch path and collector validation/exit status.
+- [x] Verify regular session, repeated run, holiday, early close, stale data,
+  zero data, and full repository checks with at least 75% coverage.
+- [x] Push a PR, request Copilot review, and inspect CI and feedback.
+
+## Rollback strategy
+
+- Revert the source PR before release, or restore the prior image through GitOps
+  if a release regresses. Keep current-day S3 objects; do not delete history.
+
+## Outcome
+
+- Implemented and verified locally: 149 tests passed at 91% coverage; Ruff,
+  Black, Mypy, and package build passed. PR #41 was pushed and all four CI
+  checks passed. Copilot was requested but reported a reviewer quota limit.
+
 # Task: Repair manual release image publishing
 
 ## Context
