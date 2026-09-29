@@ -22,7 +22,7 @@
 - [x] Fix the client fetch path and collector validation/exit status.
 - [x] Verify regular session, repeated run, holiday, early close, stale data,
   zero data, and full repository checks with at least 75% coverage.
-- [ ] Push a PR, request Copilot review, and inspect CI and feedback.
+- [x] Push a PR, request Copilot review, and inspect CI and feedback.
 
 ## Rollback strategy
 
@@ -32,7 +32,8 @@
 ## Outcome
 
 - Implemented and verified locally: 149 tests passed at 91% coverage; Ruff,
-  Black, Mypy, and package build passed. PR and CI evidence pending.
+  Black, Mypy, and package build passed. PR #41 was pushed and all four CI
+  checks passed. Copilot was requested but reported a reviewer quota limit.
 
 # Task: Repair manual release image publishing
 

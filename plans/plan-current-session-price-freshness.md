@@ -34,7 +34,7 @@ Job reported zero successful tickers and still reached Kubernetes Complete.
 - [x] Add failing current-day fetch and stale/empty failure tests.
 - [x] Implement fresh fetch and current-day range bound.
 - [x] Implement session validation and nonzero exit behavior.
-- [ ] Run targeted and full checks; open PR and check review/CI.
+- [x] Run targeted and full checks; open PR and check review/CI.
 
 ## Verification
 
@@ -62,3 +62,4 @@ the previous image's false-success behavior would need continued monitoring.
 | --- | --- |
 | 2026-09-29 | Plan created from production Job and S3 evidence. |
 | 2026-09-29 | Local checks passed: 149 tests, 91% coverage, Ruff, Black, Mypy, and package build. |
+| 2026-09-29 | PR #41 opened; all four CI checks passed. Copilot review was requested but quota limited. |
