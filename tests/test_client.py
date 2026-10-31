@@ -368,6 +368,31 @@ class TestCachedYFClient:
         assert upstream.call_args.kwargs["start"] == "2026-10-30"
         assert upstream.call_args.kwargs["end"] == "2026-10-31"
 
+    def test_current_one_minute_refresh_revises_existing_bar_without_losing_rows(
+        self, cache: FileSystemCache
+    ) -> None:
+        client = CachedYFClient(cache)
+        key = CacheKey("IWM", "1m", date(2026, 10, 30))
+        times = pd.DatetimeIndex(
+            ["2026-10-30 09:30", "2026-10-30 09:31"],
+            tz="America/New_York",
+        )
+        cached = pd.DataFrame(
+            {"Close": [100.0, 101.0], "Volume": [10.0, 20.0]}, index=times
+        )
+        revised = pd.DataFrame(
+            {"Close": [102.0], "Volume": [float("nan")]}, index=times[1:]
+        )
+        cache.store(key, cached)
+
+        with patch("yfinance.download", return_value=revised):
+            client.download("IWM", period="1d", interval="1m", progress=False)
+
+        stored = cache.load(key)
+        assert stored.loc[times[0], "Close"] == 100.0
+        assert stored.loc[times[1], "Close"] == 102.0
+        assert stored.loc[times[1], "Volume"] == 20.0
+
     def test_cached_date_range_repairs_incomplete_session(
         self, cache: FileSystemCache
     ) -> None:

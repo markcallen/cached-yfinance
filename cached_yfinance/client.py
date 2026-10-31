@@ -557,7 +557,7 @@ class CachedYFClient:
             if interval == "1m":
                 existing = self.cache.load(key)
                 if existing is not None and not existing.empty:
-                    day_frame = existing.combine_first(day_frame).sort_index()
+                    day_frame = day_frame.combine_first(existing).sort_index()
             self.cache.store(key, day_frame)
 
     def get_options_expirations(
