@@ -171,6 +171,62 @@ def test_nyse_session_skips_holiday_and_honors_early_close() -> None:
     )
 
 
+def test_after_close_requires_the_final_session_bar() -> None:
+    eastern = ZoneInfo("America/New_York")
+    now = datetime(2026, 10, 30, 16, 30, tzinfo=eastern)
+    required = ticker_collector.completed_session_last_bar(now, "America/New_York")
+    assert required == datetime(2026, 10, 30, 15, 59, tzinfo=eastern)
+
+    class StubClient:
+        def __init__(self, last_bar: str) -> None:
+            self.last_bar = last_bar
+
+        def download(self, ticker: str, **kwargs: object) -> pd.DataFrame:
+            return pd.DataFrame(
+                {"Close": [100.0]},
+                index=pd.DatetimeIndex([self.last_bar], tz=eastern),
+            )
+
+    kwargs = {
+        "session_date": date(2026, 10, 30),
+        "freshness_cutoff": datetime(2026, 10, 30, 15, 30, tzinfo=eastern),
+        "required_last_bar": required,
+        "timezone": "America/New_York",
+    }
+    partial = ticker_collector.collect_1m_data(
+        "SPCX",
+        StubClient("2026-10-30 15:30"),
+        1,
+        "1m",
+        ticker_collector.setup_logging(),
+        **kwargs,
+    )
+    complete = ticker_collector.collect_1m_data(
+        "SPCX",
+        StubClient("2026-10-30 15:59"),
+        1,
+        "1m",
+        ticker_collector.setup_logging(),
+        **kwargs,
+    )
+    assert partial["success"] is False
+    assert "final" in partial["error"]
+    assert complete["success"] is True
+
+
+def test_after_close_uses_early_close_and_waits_thirty_minutes() -> None:
+    eastern = ZoneInfo("America/New_York")
+    assert (
+        ticker_collector.completed_session_last_bar(
+            datetime(2026, 11, 27, 13, 29, tzinfo=eastern), "America/New_York"
+        )
+        is None
+    )
+    assert ticker_collector.completed_session_last_bar(
+        datetime(2026, 11, 27, 13, 30, tzinfo=eastern), "America/New_York"
+    ) == datetime(2026, 11, 27, 12, 59, tzinfo=eastern)
+
+
 def test_price_collector_main_fails_when_all_tickers_return_no_data(
     monkeypatch,
 ) -> None:

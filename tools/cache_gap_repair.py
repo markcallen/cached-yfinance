@@ -67,14 +67,34 @@ def main(argv: Sequence[str] | None = None, *, now: datetime | None = None) -> i
             report = json.load(handle)
         if args.max_sessions < 1:
             raise ValueError("max-sessions must be at least 1")
-        targets = _validated_targets(report, config, now or datetime.now(timezone.utc))
+        run_now = now or datetime.now(timezone.utc)
+        targets = _validated_targets(report, config, run_now)
         cache = create_cache(config)
     except Exception as exc:
         print(f"Gap repair cannot start: {exc}", file=sys.stderr)
         return 2
 
-    remaining = len(targets) > args.max_sessions
+    deferred = max(0, len(targets) - args.max_sessions)
+    repaired = 0
+    already_complete = 0
+    unresolved = 0
+    provider_unavailable = 0
+    provider_missing = 0
+    operational_error = 0
+    today = run_now.astimezone(ZoneInfo(report["timezone"])).date()
+    # Yahoo requires the start of a 1m request to be within its rolling
+    # 30-day window. The one-day request starts at midnight, so the day
+    # exactly 30 calendar days ago is not safe for a noon repair run.
+    earliest_full_session = today - timedelta(days=29)
     for symbol, day in targets[: args.max_sessions]:
+        if config["interval"] == "1m" and day < earliest_full_session:
+            provider_unavailable += 1
+            unresolved += 1
+            print(
+                f"{symbol} {day}: unresolved; outside Yahoo 1m full-session "
+                "retrieval window"
+            )
+            continue
         try:
             outcome = repair_gap(
                 cache,
@@ -90,14 +110,32 @@ def main(argv: Sequence[str] | None = None, *, now: datetime | None = None) -> i
                 f"{outcome.after_missing} bars"
                 + (f"; {outcome.error}" if outcome.error else "")
             )
-            if outcome.after_missing or outcome.error:
-                remaining = True
+            if outcome.error_kind in {
+                "provider_error",
+                "invalid_provider_data",
+                "cache_error",
+            }:
+                unresolved += 1
+                operational_error += 1
+            elif outcome.after_missing or outcome.error:
+                unresolved += 1
+                provider_missing += 1
+            elif outcome.before_missing:
+                repaired += 1
+            else:
+                already_complete += 1
         except Exception as exc:
             print(f"{symbol} {day}: repair failed: {exc}", file=sys.stderr)
-            remaining = True
-    if len(targets) > args.max_sessions:
-        print(f"Deferred {len(targets) - args.max_sessions} ticker-sessions")
-    return 1 if remaining else 0
+            unresolved += 1
+            operational_error += 1
+    print(
+        f"Gap repair summary: repaired={repaired} "
+        f"already_complete={already_complete} unresolved={unresolved} "
+        f"provider_unavailable={provider_unavailable} "
+        f"provider_missing={provider_missing} "
+        f"operational_error={operational_error} deferred={deferred}"
+    )
+    return 1 if unresolved or deferred else 0
 
 
 if __name__ == "__main__":
