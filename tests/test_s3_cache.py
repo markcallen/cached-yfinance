@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from datetime import date
 
 import pandas as pd
@@ -20,6 +21,14 @@ class MissingBucketError(Exception):
         self.response = {
             "ResponseMetadata": {"HTTPStatusCode": 404},
             "Error": {"Code": "NoSuchBucket"},
+        }
+
+
+class PreconditionFailedError(Exception):
+    def __init__(self) -> None:
+        self.response = {
+            "ResponseMetadata": {"HTTPStatusCode": 412},
+            "Error": {"Code": "PreconditionFailed"},
         }
 
 
@@ -44,11 +53,28 @@ class FakeS3:
     def get_object(self, *, Bucket: str, Key: str) -> dict:
         if Key not in self.objects:
             raise NotFoundError()
-        return {"Body": FakeBody(self.objects[Key])}
+        return {
+            "Body": FakeBody(self.objects[Key]),
+            "ETag": f'"{hashlib.md5(self.objects[Key]).hexdigest()}"',
+        }
 
     def put_object(
-        self, *, Bucket: str, Key: str, Body: bytes, ContentType: str
+        self,
+        *,
+        Bucket: str,
+        Key: str,
+        Body: bytes,
+        ContentType: str,
+        IfMatch: str | None = None,
+        IfNoneMatch: str | None = None,
     ) -> dict:
+        if IfNoneMatch == "*" and Key in self.objects:
+            raise PreconditionFailedError()
+        if IfMatch is not None and (
+            Key not in self.objects
+            or IfMatch != f'"{hashlib.md5(self.objects[Key]).hexdigest()}"'
+        ):
+            raise PreconditionFailedError()
         self.objects[Key] = Body
         self.content_types[Key] = ContentType
         return {}
@@ -79,6 +105,30 @@ def test_market_data_round_trip() -> None:
     assert "yfinance/IWM/1d/2026/08/2026-08-27-1d.parquet" in s3.objects
     assert "yfinance/IWM/1d/2026/08/2026-08-27-1d.json" in s3.objects
     assert list(cache.iter_cached_days("IWM", "1d")) == [date(2026, 8, 27)]
+
+
+def test_conditional_update_retries_after_concurrent_writer() -> None:
+    s3 = FakeS3()
+    cache = S3Cache("market-data", s3_client=s3)
+    key = CacheKey("SPCX", "1m", date(2026, 10, 30))
+    times = pd.date_range("2026-10-30 09:30", periods=3, freq="min", tz="UTC")
+    cache.store(key, pd.DataFrame({"Close": [100.0]}, index=times[:1]))
+    interleaved = False
+
+    def updater(current):
+        nonlocal interleaved
+        if not interleaved:
+            interleaved = True
+            cache.store(key, pd.DataFrame({"Close": [100.0, 101.0]}, index=times[:2]))
+        return pd.concat(
+            [current, pd.DataFrame({"Close": [102.0]}, index=times[2:])]
+        ).sort_index()
+
+    result = cache.update_price_frame(key, updater)
+
+    assert interleaved
+    assert list(result["Close"]) == [100.0, 101.0, 102.0]
+    assert list(cache.load(key)["Close"]) == [100.0, 101.0, 102.0]
 
 
 def test_s3_cache_initializes_filesystem_base_state() -> None:

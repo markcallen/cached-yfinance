@@ -1,13 +1,76 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
+import tempfile
+import time
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import date, datetime
 from pathlib import Path
-from typing import Any, Iterable, Optional
+from typing import Any, Callable, Iterable, Iterator, Optional
 
 import pandas as pd
+
+
+def merge_price_frames(preferred: pd.DataFrame, fallback: pd.DataFrame) -> pd.DataFrame:
+    """Merge bars; non-null preferred values win and naive times mean UTC."""
+    preferred_index = preferred.index
+    fallback_index = fallback.index
+    if not isinstance(preferred_index, pd.DatetimeIndex) or not isinstance(
+        fallback_index, pd.DatetimeIndex
+    ):
+        raise ValueError("price frames need datetime indexes")
+    if preferred_index.tz != fallback_index.tz:
+        preferred = preferred.copy()
+        fallback = fallback.copy()
+        preferred.index = (
+            preferred_index.tz_localize("UTC")
+            if preferred_index.tz is None
+            else preferred_index.tz_convert("UTC")
+        )
+        fallback.index = (
+            fallback_index.tz_localize("UTC")
+            if fallback_index.tz is None
+            else fallback_index.tz_convert("UTC")
+        )
+    return preferred.combine_first(fallback).sort_index()
+
+
+@contextmanager
+def _file_lock(path: Path) -> Iterator[None]:
+    """Use an OS file lock so independent local processes update one key safely."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a+b") as handle:
+        deadline = time.monotonic() + 30
+        while True:
+            try:
+                if os.name == "nt":  # pragma: no cover - Windows only
+                    import msvcrt
+
+                    handle.seek(0)
+                    getattr(msvcrt, "locking")(
+                        handle.fileno(), getattr(msvcrt, "LK_NBLCK"), 1
+                    )
+                else:
+                    import fcntl
+
+                    fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except (BlockingIOError, OSError):
+                if time.monotonic() >= deadline:
+                    raise TimeoutError(f"Timed out waiting for cache lock {path}")
+                time.sleep(0.05)
+        try:
+            yield
+        finally:
+            if os.name == "nt":  # pragma: no cover - Windows only
+                getattr(msvcrt, "locking")(
+                    handle.fileno(), getattr(msvcrt, "LK_UNLCK"), 1
+                )
+            else:
+                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
 
 def _sanitize_symbol(symbol: str) -> str:
@@ -150,13 +213,38 @@ class FileSystemCache:
             return None
         return pd.read_parquet(path)
 
+    def update_price_frame(
+        self,
+        key: CacheKey,
+        updater: Callable[[Optional[pd.DataFrame]], Optional[pd.DataFrame]],
+    ) -> Optional[pd.DataFrame]:
+        """Lock, reload, and apply a price update against the latest local frame."""
+        lock_path = self._data_path(key.symbol, key.interval, key.day).with_suffix(
+            ".lock"
+        )
+        with _file_lock(lock_path):
+            current = self.load(key)
+            updated = updater(current)
+            if updated is None:
+                return current
+            self.store(key, updated)
+            return updated
+
     def store(self, key: CacheKey, frame: pd.DataFrame) -> None:
         if frame.empty:
             return
         base_dir = self._base_dir(key.symbol, key.interval, key.day)
         base_dir.mkdir(parents=True, exist_ok=True)
         path = self._data_path(key.symbol, key.interval, key.day)
-        frame.to_parquet(path)
+        with tempfile.NamedTemporaryFile(
+            dir=base_dir, suffix=".parquet", delete=False
+        ) as temporary:
+            temporary_path = Path(temporary.name)
+        try:
+            frame.to_parquet(temporary_path)
+            os.replace(temporary_path, path)
+        finally:
+            temporary_path.unlink(missing_ok=True)
         meta = {
             "symbol": key.symbol,
             "interval": key.interval,

@@ -8,7 +8,7 @@ from typing import Callable
 
 import pandas as pd
 
-from .cache import CacheKey, FileSystemCache
+from .cache import CacheKey, FileSystemCache, merge_price_frames
 from .gaps import expected_session_times, missing_session_times
 
 
@@ -22,34 +22,6 @@ class RepairOutcome:
     before_missing: int
     after_missing: int
     error: str | None = None
-
-
-def merge_price_frames(preferred: pd.DataFrame, fallback: pd.DataFrame) -> pd.DataFrame:
-    """Merge bars, treating naive intraday indexes as UTC when zones differ.
-
-    Non-null values in preferred win. The caller chooses whether a provider
-    refresh or an existing archive has precedence.
-    """
-    preferred_index = preferred.index
-    fallback_index = fallback.index
-    if not isinstance(preferred_index, pd.DatetimeIndex) or not isinstance(
-        fallback_index, pd.DatetimeIndex
-    ):
-        raise ValueError("price frames need datetime indexes")
-    if preferred_index.tz != fallback_index.tz:
-        preferred = preferred.copy()
-        fallback = fallback.copy()
-        preferred.index = (
-            preferred_index.tz_localize("UTC")
-            if preferred_index.tz is None
-            else preferred_index.tz_convert("UTC")
-        )
-        fallback.index = (
-            fallback_index.tz_localize("UTC")
-            if fallback_index.tz is None
-            else fallback_index.tz_convert("UTC")
-        )
-    return preferred.combine_first(fallback).sort_index()
 
 
 def _valid_fetched_rows(
@@ -101,27 +73,30 @@ def repair_gap(
         )
         if fetched.empty:
             return RepairOutcome(symbol, day, before, before, "no valid bars returned")
-        if existing is not None and not existing.empty:
-            if (
-                not existing.columns.is_unique
-                or not fetched.columns.is_unique
-                or set(existing.columns) != set(fetched.columns)
-            ):
-                return RepairOutcome(
-                    symbol,
-                    day,
-                    before,
-                    before,
-                    "downloaded columns differ from archive",
+
+        def updater(current: pd.DataFrame | None) -> pd.DataFrame | None:
+            if current is not None and not current.empty:
+                if (
+                    not current.columns.is_unique
+                    or not fetched.columns.is_unique
+                    or set(current.columns) != set(fetched.columns)
+                ):
+                    raise ValueError("downloaded columns differ from archive")
+                merged = merge_price_frames(
+                    current, fetched.reindex(columns=current.columns)
                 )
-            merged = merge_price_frames(
-                existing, fetched.reindex(columns=existing.columns)
+            else:
+                merged = fetched.sort_index()
+            current_missing = len(
+                missing_session_times(current, expected, interval, timezone)
             )
-        else:
-            merged = fetched.sort_index()
-        after = len(missing_session_times(merged, expected, interval, timezone))
-        if after < before:
-            cache.store(key, merged)
+            merged_missing = len(
+                missing_session_times(merged, expected, interval, timezone)
+            )
+            return merged if merged_missing < current_missing else None
+
+        latest = cache.update_price_frame(key, updater)
+        after = len(missing_session_times(latest, expected, interval, timezone))
         return RepairOutcome(symbol, day, before, after)
     except Exception as exc:
         return RepairOutcome(symbol, day, before, before, str(exc))

@@ -21,6 +21,14 @@ class MemoryCache:
         self.stores += 1
         self.frames[key] = frame
 
+    def update_price_frame(self, key, updater):
+        current = self.load(key)
+        updated = updater(current)
+        if updated is not None:
+            self.store(key, updated)
+            return updated
+        return current
+
 
 def test_repair_fills_only_missing_bar_and_preserves_archive() -> None:
     day = date(2026, 10, 30)
@@ -124,6 +132,24 @@ def test_repair_merges_utc_naive_and_aware_indexes() -> None:
     assert outcome.after_missing == outcome.before_missing - 1
     assert len(cache.load(key)) == 2
     assert str(cache.load(key).index.tz) == "UTC"
+
+
+def test_repair_reloads_archive_after_concurrent_writer() -> None:
+    day = date(2026, 10, 30)
+    key = CacheKey("SPCX", "1m", day)
+    times = pd.date_range(
+        "2026-10-30 09:30", periods=3, freq="min", tz="America/New_York"
+    )
+    cache = MemoryCache({})
+
+    def fetch(*_) -> pd.DataFrame:
+        cache.store(key, pd.DataFrame({"Close": [100.0, 101.0]}, index=times[:2]))
+        return pd.DataFrame({"Close": [102.0]}, index=times[2:])
+
+    outcome = repair_gap(cache, "SPCX", day, "1m", fetch)
+
+    assert (outcome.before_missing, outcome.after_missing) == (390, 387)
+    assert list(cache.load(key)["Close"]) == [100.0, 101.0, 102.0]
 
 
 def test_repair_reports_partial_progress_and_provider_error() -> None:

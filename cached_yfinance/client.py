@@ -15,8 +15,7 @@ try:  # pragma: no cover - optional dependency
 except ModuleNotFoundError:  # pragma: no cover - optional dependency
     mcal = None
 
-from .cache import CacheKey, FileSystemCache, OptionCacheKey
-from .repair import merge_price_frames
+from .cache import CacheKey, FileSystemCache, OptionCacheKey, merge_price_frames
 
 
 TickerInput = Union[str, List[str]]
@@ -415,7 +414,16 @@ class CachedYFClient:
                         "Recent 1m history remains stale for %s on %s", ticker, day
                     )
                     continue
-                self.cache.store(key, merge_price_frames(existing, fetched))
+                self.cache.update_price_frame(
+                    key,
+                    lambda current: (
+                        merge_price_frames(current, fetched)
+                        if current is not None
+                        and _looks_like_nyse_regular_hours(current, day)
+                        and _session_tail_is_stale(current, day, close)
+                        else None
+                    ),
+                )
             except Exception as exc:
                 logger.warning(
                     "Could not repair recent 1m history for %s on %s: %s",
@@ -556,10 +564,16 @@ class CachedYFClient:
                 continue
             key = CacheKey(symbol=ticker, interval=interval, day=day.date())
             if interval == "1m":
-                existing = self.cache.load(key)
-                if existing is not None and not existing.empty:
-                    day_frame = merge_price_frames(day_frame, existing)
-            self.cache.store(key, day_frame)
+                self.cache.update_price_frame(
+                    key,
+                    lambda current: (
+                        merge_price_frames(day_frame, current)
+                        if current is not None and not current.empty
+                        else day_frame
+                    ),
+                )
+            else:
+                self.cache.store(key, day_frame)
 
     def get_options_expirations(
         self, ticker: str, use_cache: bool = True
