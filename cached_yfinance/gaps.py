@@ -75,12 +75,30 @@ def expected_session_times(
     if duration is None:
         return pd.DatetimeIndex([pd.Timestamp(day, tz=timezone)])
     row = schedule.iloc[0]
-    return pd.date_range(
-        row["market_open"].tz_convert(timezone),
-        row["market_close"].tz_convert(timezone),
-        freq=duration,
-        inclusive="left",
-    )
+    segments = [(row["market_open"], row["market_close"])]
+    if (
+        "break_start" in schedule.columns
+        and "break_end" in schedule.columns
+        and pd.notna(row["break_start"])
+        and pd.notna(row["break_end"])
+    ):
+        segments = [
+            (row["market_open"], row["break_start"]),
+            (row["break_end"], row["market_close"]),
+        ]
+    expected = pd.DatetimeIndex([], tz=timezone)
+    for segment_open, segment_close in segments:
+        expected = pd.DatetimeIndex(
+            expected.append(
+                pd.date_range(
+                    segment_open.tz_convert(timezone),
+                    segment_close.tz_convert(timezone),
+                    freq=duration,
+                    inclusive="left",
+                )
+            )
+        )
+    return expected
 
 
 def missing_session_times(

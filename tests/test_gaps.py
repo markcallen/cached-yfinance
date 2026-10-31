@@ -6,7 +6,7 @@ import pandas as pd
 import pytest
 
 from cached_yfinance.cache import CacheKey
-from cached_yfinance.gaps import check_cache_gaps
+from cached_yfinance.gaps import check_cache_gaps, expected_session_times
 from tools import cache_gap_check
 
 
@@ -65,6 +65,36 @@ def test_audit_uses_interval_and_early_close() -> None:
     assert len(findings) == 1
     assert (findings[0].expected_bars, findings[0].missing_bars) == (42, 1)
     assert findings[0].last_missing == five_minute[-1].to_pydatetime()
+
+
+def test_audit_excludes_exchange_trading_break() -> None:
+    day = date(2026, 10, 30)
+    expected = expected_session_times(
+        day, "1m", calendar_name="JPX", timezone="Asia/Tokyo"
+    )
+    assert len(expected) == 330
+    assert pd.Timestamp("2026-10-30 11:30", tz="Asia/Tokyo") not in expected
+    assert pd.Timestamp("2026-10-30 12:29", tz="Asia/Tokyo") not in expected
+    cache = ReadOnlyCache(
+        {
+            CacheKey("SPCX", "1m", day): pd.DataFrame(
+                {"Close": [100.0] * 330}, index=expected
+            )
+        }
+    )
+
+    assert (
+        check_cache_gaps(
+            cache,
+            ["SPCX"],
+            "1m",
+            days=1,
+            now=datetime(2026, 10, 31, 12, 0, tzinfo=ZoneInfo("Asia/Tokyo")),
+            calendar_name="JPX",
+            timezone="Asia/Tokyo",
+        )
+        == []
+    )
 
 
 def test_audit_skips_holiday_and_accepts_daily_bar() -> None:

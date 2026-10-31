@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import stat
 import tempfile
 import time
 from contextlib import contextmanager
@@ -242,6 +243,8 @@ class FileSystemCache:
             temporary_path = Path(temporary.name)
         try:
             frame.to_parquet(temporary_path)
+            mode = stat.S_IMODE(path.stat().st_mode) if path.exists() else 0o600
+            os.chmod(temporary_path, mode)
             os.replace(temporary_path, path)
         finally:
             temporary_path.unlink(missing_ok=True)
