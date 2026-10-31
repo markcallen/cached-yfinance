@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from functools import lru_cache
@@ -14,10 +15,11 @@ try:  # pragma: no cover - optional dependency
 except ModuleNotFoundError:  # pragma: no cover - optional dependency
     mcal = None
 
-from .cache import CacheKey, FileSystemCache, OptionCacheKey
+from .cache import CacheKey, FileSystemCache, OptionCacheKey, merge_price_frames
 
 
 TickerInput = Union[str, List[str]]
+logger = logging.getLogger(__name__)
 
 
 class OptionChain(NamedTuple):
@@ -152,6 +154,68 @@ def _trading_days_inclusive(start: pd.Timestamp, end: pd.Timestamp) -> Iterable[
     return trading_days
 
 
+def _recent_completed_nyse_sessions(
+    now: pd.Timestamp,
+) -> List[Tuple[date, pd.Timestamp]]:
+    """Return completed sessions still within Yahoo's short 1m history window."""
+    if now.tz is None:
+        now = now.tz_localize("UTC")
+    calendar = _nyse_calendar()
+    if calendar is None:
+        return []
+    schedule = calendar.schedule(
+        start_date=(now - pd.Timedelta(days=6)).date(), end_date=now.date()
+    )
+    return [
+        (session.date(), row["market_close"])
+        for session, row in schedule.iterrows()
+        if row["market_close"] <= now
+    ]
+
+
+def _session_tail_is_stale(
+    frame: pd.DataFrame, session_day: date, market_close: pd.Timestamp
+) -> bool:
+    """Use the existing 30-minute tolerance for a cached completed session."""
+    if frame.empty or not isinstance(frame.index, pd.DatetimeIndex):
+        return True
+    index = frame.index
+    if index.tz is None:
+        index = index.tz_localize("UTC")
+    local_index = index.tz_convert("America/New_York")
+    session_rows = local_index.date == session_day
+    if not session_rows.any():
+        return True
+    try:
+        closes = frame.loc[session_rows, "Close"]
+    except KeyError:
+        return True
+    valid = closes.notna()
+    if isinstance(valid, pd.DataFrame):
+        valid = valid.any(axis=1)
+    valid_index = local_index[session_rows][valid.to_numpy()]
+    return valid_index.empty or valid_index.max() < market_close - pd.Timedelta(
+        minutes=30
+    )
+
+
+def _looks_like_nyse_regular_hours(frame: pd.DataFrame, session_day: date) -> bool:
+    """Avoid applying the NYSE repair rule to other markets and premarket data."""
+    if frame.empty or not isinstance(frame.index, pd.DatetimeIndex):
+        return False
+    index = frame.index
+    if index.tz is None:
+        index = index.tz_localize("UTC")
+    local_index = index.tz_convert("America/New_York")
+    session_index = local_index[local_index.date == session_day]
+    if session_index.empty:
+        return False
+    market_open = pd.Timestamp(session_day, tz="America/New_York") + pd.Timedelta(
+        hours=9, minutes=30
+    )
+    return session_index.min() >= market_open - pd.Timedelta(minutes=5)
+
+
 def _merge_dataframes(frames: List[pd.DataFrame]) -> pd.DataFrame:
     if not frames:
         return pd.DataFrame()
@@ -215,6 +279,7 @@ class CachedYFClient:
                 **kwargs,
             )
             self._persist(tickers, interval, fetched)
+            self._repair_recent_incomplete_one_minute_sessions(tickers, kwargs)
             return fetched
 
         req = DownloadRequest(tickers, interval, None, None, kwargs)
@@ -247,6 +312,11 @@ class CachedYFClient:
 
         req.start = start_ts
         req.end = end_ts
+
+        if interval == "1m":
+            self._repair_recent_incomplete_one_minute_sessions(
+                tickers, kwargs, start_ts, end_ts
+            )
 
         if start_ts is None or end_ts is None:
             fetched = yf.download(
@@ -298,6 +368,69 @@ class CachedYFClient:
             # yfinance default sorts already; ensure same behavior here.
             merged.sort_index(inplace=True)
         return merged
+
+    def _repair_recent_incomplete_one_minute_sessions(
+        self,
+        ticker: str,
+        kwargs: Dict[str, object],
+        start: Optional[pd.Timestamp] = None,
+        end: Optional[pd.Timestamp] = None,
+    ) -> None:
+        """Refresh cached completed sessions whose tail is over 30 minutes short."""
+        now = pd.Timestamp.now(tz="UTC")
+        for day, close in _recent_completed_nyse_sessions(now):
+            if start is not None and day < start.date():
+                continue
+            if end is not None:
+                end_local = (
+                    end.tz_localize("America/New_York")
+                    if end.tz is None
+                    else end.tz_convert("America/New_York")
+                )
+                session_open = pd.Timestamp(day, tz="America/New_York") + pd.Timedelta(
+                    hours=9, minutes=30
+                )
+                if end_local <= session_open:
+                    continue
+            key = CacheKey(symbol=ticker, interval="1m", day=day)
+            try:
+                existing = self.cache.load(key)
+                if (
+                    existing is None
+                    or not _looks_like_nyse_regular_hours(existing, day)
+                    or not _session_tail_is_stale(existing, day, close)
+                ):
+                    continue
+                fetched = yf.download(
+                    ticker,
+                    start=day.isoformat(),
+                    end=(day + timedelta(days=1)).isoformat(),
+                    interval="1m",
+                    auto_adjust=False,
+                    **kwargs,
+                )
+                if _session_tail_is_stale(fetched, day, close):
+                    logger.warning(
+                        "Recent 1m history remains stale for %s on %s", ticker, day
+                    )
+                    continue
+                self.cache.update_price_frame(
+                    key,
+                    lambda current: (
+                        merge_price_frames(current, fetched)
+                        if current is not None
+                        and _looks_like_nyse_regular_hours(current, day)
+                        and _session_tail_is_stale(current, day, close)
+                        else None
+                    ),
+                )
+            except Exception as exc:
+                logger.warning(
+                    "Could not repair recent 1m history for %s on %s: %s",
+                    ticker,
+                    day,
+                    exc,
+                )
 
     def _load_from_cache(
         self,
@@ -430,7 +563,17 @@ class CachedYFClient:
             if day_frame.empty:
                 continue
             key = CacheKey(symbol=ticker, interval=interval, day=day.date())
-            self.cache.store(key, day_frame)
+            if interval == "1m":
+                self.cache.update_price_frame(
+                    key,
+                    lambda current: (
+                        merge_price_frames(day_frame, current)
+                        if current is not None and not current.empty
+                        else day_frame
+                    ),
+                )
+            else:
+                self.cache.store(key, day_frame)
 
     def get_options_expirations(
         self, ticker: str, use_cache: bool = True

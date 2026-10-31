@@ -236,6 +236,22 @@ for symbol in ["SPY", "QQQ", "IWM"]:
   newest bar no more than 30 minutes behind the earlier of the run time and
   that session's market close. Missing or stale data makes the process exit
   nonzero; a non-trading day is logged as a skip.
+- **Recent One-Minute Cache Repair:** A one-minute download also checks cached
+  NYSE sessions from the previous six calendar days. If a completed session's
+  last bar is over 30 minutes before its market close, the client refetches
+  that date and replaces the cached frame only when the new response reaches
+  the freshness cutoff. The repair happens during a later download call; no
+  background scheduler is required.
+- **Read-Only Gap Audit:** A separate check inspects the previous 30 calendar
+  days of completed NYSE sessions for the configured symbols and bar interval.
+  It reports missing archived days, missing interval-aligned bars, and null
+  closes; it exits nonzero when a gap exists and never fetches or writes prices.
+  Intraday minute/hour intervals and one-day bars are supported.
+- **Gap Repair:** A follow-on command consumes a fresh JSON gap report and
+  refetches affected ticker-sessions, newest first. It keeps existing bars and
+  writes an archive only when valid fetched data reduces missing bars. It
+  reports unresolved gaps and exits nonzero; a run can cap the number of
+  sessions attempted. The audit itself remains read-only.
 - **Retrieval Compatibility:** Price data retains the established
   `symbol/interval/YYYY/MM/YYYY-MM-DD-interval.parquet` and JSON metadata key
   layout and remains readable through `S3Cache`.

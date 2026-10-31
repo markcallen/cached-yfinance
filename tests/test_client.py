@@ -13,10 +13,13 @@ from cached_yfinance.client import (
     DownloadRequest,
     OptionChain,
     _contiguous_ranges,
+    _looks_like_nyse_regular_hours,
     _merge_dataframes,
     _normalize_range,
     _parse_period_to_timedelta,
     _parse_timestamp,
+    _recent_completed_nyse_sessions,
+    _session_tail_is_stale,
     _trading_days_inclusive,
     download,
     get_option_chain,
@@ -319,7 +322,233 @@ class TestCachedYFClient:
             }
         pd.testing.assert_frame_equal(first, fresh)
         pd.testing.assert_frame_equal(second, fresher)
-        pd.testing.assert_frame_equal(cache.load(key), fresher)
+        expected = pd.concat([cached, fresh, fresher]).sort_index()
+        pd.testing.assert_frame_equal(cache.load(key), expected)
+
+    def test_current_request_repairs_incomplete_previous_session(
+        self, cache: FileSystemCache
+    ) -> None:
+        client = CachedYFClient(cache)
+        previous = CacheKey("SPCX", "1m", date(2026, 10, 30))
+        partial = pd.DataFrame(
+            {"Close": [100.0, 101.0]},
+            index=pd.DatetimeIndex(
+                ["2026-10-30 13:30:00+00:00", "2026-10-30 18:33:00+00:00"]
+            ),
+        )
+        complete = pd.DataFrame(
+            {"Close": [100.0, 101.0, 102.0]},
+            index=pd.DatetimeIndex(
+                [
+                    "2026-10-30 13:30:00+00:00",
+                    "2026-10-30 18:33:00+00:00",
+                    "2026-10-30 19:59:00+00:00",
+                ]
+            ),
+        )
+        current = pd.DataFrame(
+            {"Close": [103.0]},
+            index=pd.DatetimeIndex(["2026-11-02 14:30:00+00:00"]),
+        )
+        cache.store(previous, partial)
+
+        sessions = [(date(2026, 10, 30), pd.Timestamp("2026-10-30 20:00:00+00:00"))]
+        with (
+            patch(
+                "cached_yfinance.client._recent_completed_nyse_sessions",
+                return_value=sessions,
+            ),
+            patch("yfinance.download", side_effect=[current, complete]) as upstream,
+        ):
+            result = client.download("SPCX", period="1d", interval="1m", progress=False)
+
+        pd.testing.assert_frame_equal(result, current)
+        pd.testing.assert_frame_equal(cache.load(previous), complete)
+        assert upstream.call_count == 2
+        assert upstream.call_args.kwargs["start"] == "2026-10-30"
+        assert upstream.call_args.kwargs["end"] == "2026-10-31"
+
+    def test_current_one_minute_refresh_revises_existing_bar_without_losing_rows(
+        self, cache: FileSystemCache
+    ) -> None:
+        client = CachedYFClient(cache)
+        key = CacheKey("IWM", "1m", date(2026, 10, 30))
+        times = pd.DatetimeIndex(
+            ["2026-10-30 09:30", "2026-10-30 09:31"],
+            tz="America/New_York",
+        )
+        cached = pd.DataFrame(
+            {"Close": [100.0, 101.0], "Volume": [10.0, 20.0]}, index=times
+        )
+        revised = pd.DataFrame(
+            {"Close": [102.0], "Volume": [float("nan")]}, index=times[1:]
+        )
+        cache.store(key, cached)
+
+        with patch("yfinance.download", return_value=revised):
+            client.download("IWM", period="1d", interval="1m", progress=False)
+
+        stored = cache.load(key)
+        assert stored.loc[times[0], "Close"] == 100.0
+        assert stored.loc[times[1], "Close"] == 102.0
+        assert stored.loc[times[1], "Volume"] == 20.0
+
+    @pytest.mark.parametrize("cached_is_naive", [True, False])
+    def test_current_one_minute_refresh_merges_mixed_timezone_indexes(
+        self, cache: FileSystemCache, cached_is_naive: bool
+    ) -> None:
+        client = CachedYFClient(cache)
+        key = CacheKey("IWM", "1m", date(2026, 10, 30))
+        aware = pd.DatetimeIndex(["2026-10-30 13:30:00+00:00"])
+        naive = aware.tz_localize(None)
+        cache.store(
+            key,
+            pd.DataFrame({"Close": [100.0]}, index=naive if cached_is_naive else aware),
+        )
+        fresh = pd.DataFrame(
+            {"Close": [101.0]}, index=aware if cached_is_naive else naive
+        )
+
+        with patch("yfinance.download", return_value=fresh):
+            result = client.download("IWM", period="1d", interval="1m", progress=False)
+
+        pd.testing.assert_frame_equal(result, fresh)
+        stored = cache.load(key)
+        assert len(stored) == 1
+        assert str(stored.index.tz) == "UTC"
+        assert stored.iloc[0]["Close"] == 101.0
+
+    def test_cached_date_range_repairs_incomplete_session(
+        self, cache: FileSystemCache
+    ) -> None:
+        client = CachedYFClient(cache)
+        key = CacheKey("SPCX", "1m", date(2026, 10, 30))
+        partial = pd.DataFrame(
+            {"Close": [100.0]},
+            index=pd.DatetimeIndex(["2026-10-30 18:33:00+00:00"]),
+        )
+        complete = pd.DataFrame(
+            {"Close": [100.0, 101.0]},
+            index=pd.DatetimeIndex(
+                ["2026-10-30 18:33:00+00:00", "2026-10-30 19:59:00+00:00"]
+            ),
+        )
+        cache.store(key, partial)
+        sessions = [(date(2026, 10, 30), pd.Timestamp("2026-10-30 20:00:00+00:00"))]
+
+        with (
+            patch(
+                "cached_yfinance.client._recent_completed_nyse_sessions",
+                return_value=sessions,
+            ),
+            patch("yfinance.download", return_value=complete) as upstream,
+        ):
+            result = client.download(
+                "SPCX", start="2026-10-30", end="2026-10-31", interval="1m"
+            )
+
+        pd.testing.assert_frame_equal(cache.load(key), complete)
+        pd.testing.assert_frame_equal(result, complete)
+        upstream.assert_called_once()
+
+    def test_still_stale_upstream_does_not_replace_cached_session(
+        self, cache: FileSystemCache
+    ) -> None:
+        client = CachedYFClient(cache)
+        key = CacheKey("SPCX", "1m", date(2026, 10, 30))
+        partial = pd.DataFrame(
+            {"Close": [100.0]},
+            index=pd.DatetimeIndex(["2026-10-30 18:33:00+00:00"]),
+        )
+        cache.store(key, partial)
+        sessions = [(date(2026, 10, 30), pd.Timestamp("2026-10-30 20:00:00+00:00"))]
+
+        with (
+            patch(
+                "cached_yfinance.client._recent_completed_nyse_sessions",
+                return_value=sessions,
+            ),
+            patch("yfinance.download", return_value=partial) as upstream,
+        ):
+            result = client.download(
+                "SPCX", start="2026-10-30", end="2026-10-31", interval="1m"
+            )
+
+        upstream.assert_called_once()
+        pd.testing.assert_frame_equal(result, partial)
+        pd.testing.assert_frame_equal(cache.load(key), partial)
+
+    def test_recent_completed_sessions_respect_dst_and_early_close(self) -> None:
+        monday = _recent_completed_nyse_sessions(pd.Timestamp("2026-11-02 14:00:00Z"))
+        assert monday[-1] == (
+            date(2026, 10, 30),
+            pd.Timestamp("2026-10-30 20:00:00Z"),
+        )
+        early_close = _recent_completed_nyse_sessions(
+            pd.Timestamp("2026-11-27 19:00:00Z")
+        )
+        assert early_close[-1] == (
+            date(2026, 11, 27),
+            pd.Timestamp("2026-11-27 18:00:00Z"),
+        )
+
+    def test_session_tail_requires_a_valid_close(self) -> None:
+        frame = pd.DataFrame(
+            {("Close", "SPCX"): [100.0, float("nan")]},
+            index=pd.DatetimeIndex(
+                ["2026-10-30 18:33:00+00:00", "2026-10-30 19:59:00+00:00"]
+            ),
+        )
+        assert _session_tail_is_stale(
+            frame, date(2026, 10, 30), pd.Timestamp("2026-10-30 20:00:00Z")
+        )
+
+    def test_recent_repair_ignores_non_nyse_hours(self) -> None:
+        european_session = pd.DataFrame(
+            {"Close": [100.0, 101.0]},
+            index=pd.DatetimeIndex(
+                ["2026-10-30 08:00:00+00:00", "2026-10-30 15:30:00+00:00"]
+            ),
+        )
+        assert not _looks_like_nyse_regular_hours(european_session, date(2026, 10, 30))
+
+    def test_recent_repair_includes_session_with_intraday_end_and_keeps_valid_fields(
+        self, cache: FileSystemCache
+    ) -> None:
+        client = CachedYFClient(cache)
+        day = date(2026, 10, 30)
+        key = CacheKey("SPCX", "1m", day)
+        times = pd.DatetimeIndex(
+            ["2026-10-30 09:30", "2026-10-30 15:59"],
+            tz="America/New_York",
+        )
+        partial = pd.DataFrame({"Open": [99.0], "Close": [100.0]}, index=times[:1])
+        fetched = pd.DataFrame(
+            {"Open": [float("nan"), 101.0], "Close": [float("nan"), 102.0]},
+            index=times,
+        )
+        cache.store(key, partial)
+        sessions = [(day, pd.Timestamp("2026-10-30 20:00:00Z"))]
+
+        with (
+            patch(
+                "cached_yfinance.client._recent_completed_nyse_sessions",
+                return_value=sessions,
+            ),
+            patch("yfinance.download", return_value=fetched) as upstream,
+        ):
+            client._repair_recent_incomplete_one_minute_sessions(
+                "SPCX",
+                {},
+                pd.Timestamp("2026-10-30 09:30", tz="America/New_York"),
+                pd.Timestamp("2026-10-30 16:00", tz="America/New_York"),
+            )
+
+        upstream.assert_called_once()
+        repaired = cache.load(key)
+        assert repaired.loc[times[0], "Open"] == 99.0
+        assert repaired.loc[times[0], "Close"] == 100.0
+        assert repaired.loc[times[1], "Close"] == 102.0
 
     @patch("cached_yfinance.client.pd.Timestamp.now")
     @patch("yfinance.download")

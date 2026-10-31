@@ -15,6 +15,8 @@ A high-performance caching wrapper around [yfinance](https://github.com/ranarous
 - **Market calendar awareness** with pandas-market-calendars
 - **Thread-safe operations**
 - **Automatic cache invalidation** for stale data
+- **Recent one-minute cache repair** for incomplete NYSE sessions on the next
+  one-minute request
 
 ## 🏃‍♂️ Quick Start
 
@@ -66,6 +68,27 @@ client = CachedYFClient(cache)
 # Download with custom client
 data = client.download("TSLA", start="2023-01-01", end="2023-12-31")
 ```
+
+For one-minute downloads, the client checks recent cached NYSE sessions when it
+is called again. If a completed session ends more than 30 minutes before the
+market close, it asks Yahoo for that date again and preserves the cached data
+until a fresher response arrives. This runs during `download()`, with no
+background job. The automatic repair window is six calendar days; an older
+session or one that is never requested again requires an explicit backfill.
+
+To audit a collector cache without changing it, run
+`python tools/cache_gap_check.py --config tools/ticker_collector_config.json --days 30`.
+The check uses the configured interval and NYSE calendar, excludes the current
+day, and exits with status 1 when it finds missing bars. It supports minute and
+hour intervals plus `1d`; unsupported intervals fail with a clear error.
+
+To repair gaps from a fresh report, run the check with
+`--json-output /tmp/gaps.json`, then run
+`python tools/cache_gap_repair.py --config tools/ticker_collector_config.json --report /tmp/gaps.json`.
+The repair command tries the newest affected sessions first, up to 200 per run.
+It merges valid downloaded bars into the archive only when that reduces the
+gap count, and exits nonzero if any gaps remain. Yahoo may not serve older
+intraday bars, so those sessions remain reported for manual recovery.
 
 ## 📦 Installation
 

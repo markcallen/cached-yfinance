@@ -1,6 +1,8 @@
 """Tests for the cache module."""
 
 import json
+import os
+import stat
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any
@@ -15,6 +17,22 @@ from cached_yfinance.cache import (
     _ensure_datetime,
     _sanitize_symbol,
 )
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX file mode test")
+def test_atomic_price_store_preserves_existing_file_mode(tmp_path: Path) -> None:
+    cache = FileSystemCache(tmp_path)
+    key = CacheKey("SPCX", "1m", date(2026, 10, 30))
+    frame = pd.DataFrame(
+        {"Close": [100.0]}, index=pd.DatetimeIndex(["2026-10-30 13:30:00Z"])
+    )
+    cache.store(key, frame)
+    path = cache._data_path(key.symbol, key.interval, key.day)
+    path.chmod(0o640)
+
+    cache.store(key, frame)
+
+    assert stat.S_IMODE(path.stat().st_mode) == 0o640
 
 
 class TestCacheKey:

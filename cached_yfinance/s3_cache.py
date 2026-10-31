@@ -3,7 +3,7 @@ from __future__ import annotations
 import io
 import json
 from datetime import date, datetime
-from typing import Any, Iterable, Optional
+from typing import Any, Callable, Iterable, Optional
 
 import pandas as pd
 
@@ -148,6 +148,76 @@ class S3Cache(FileSystemCache):
         if not self._exists(object_key):
             return None
         return pd.read_parquet(io.BytesIO(self._get_bytes(object_key)))
+
+    def update_price_frame(
+        self,
+        key: CacheKey,
+        updater: Callable[[Optional[pd.DataFrame]], Optional[pd.DataFrame]],
+    ) -> Optional[pd.DataFrame]:
+        """Retry a conditional S3 write so concurrent writers cannot lose bars."""
+        object_key = self._data_key(key.symbol, key.interval, key.day)
+        for _ in range(4):
+            try:
+                response = self.s3.get_object(Bucket=self.bucket, Key=object_key)
+            except Exception as exc:
+                detail = getattr(exc, "response", {})
+                code = detail.get("Error", {}).get("Code")
+                status = detail.get("ResponseMetadata", {}).get("HTTPStatusCode")
+                if code not in {"404", "NoSuchKey", "NotFound"} and not (
+                    status == 404 and code is None
+                ):
+                    raise
+                current = None
+                etag = None
+            else:
+                etag = response.get("ETag")
+                if not etag:
+                    raise RuntimeError("S3 response lacks ETag for conditional update")
+                current = pd.read_parquet(io.BytesIO(response["Body"].read()))
+
+            updated = updater(current)
+            if updated is None:
+                return current
+            buffer = io.BytesIO()
+            updated.to_parquet(buffer)
+            condition = {"IfMatch": etag} if etag else {"IfNoneMatch": "*"}
+            try:
+                self.s3.put_object(
+                    Bucket=self.bucket,
+                    Key=object_key,
+                    Body=buffer.getvalue(),
+                    ContentType="application/vnd.apache.parquet",
+                    **condition,
+                )
+            except Exception as exc:
+                detail = getattr(exc, "response", {})
+                code = detail.get("Error", {}).get("Code")
+                status = detail.get("ResponseMetadata", {}).get("HTTPStatusCode")
+                if code in {
+                    "PreconditionFailed",
+                    "ConditionalRequestConflict",
+                } or status in {
+                    409,
+                    412,
+                }:
+                    continue
+                raise
+            meta = {
+                "symbol": key.symbol,
+                "interval": key.interval,
+                "day": key.day.isoformat(),
+                "rows": int(len(updated)),
+                "columns": list(updated.columns),
+            }
+            self._put_bytes(
+                self._meta_key(key.symbol, key.interval, key.day),
+                json.dumps(meta, indent=2).encode("utf-8"),
+                "application/json",
+            )
+            return updated
+        raise RuntimeError(
+            f"S3 conditional update conflicted repeatedly for {object_key}"
+        )
 
     def store(self, key: CacheKey, frame: pd.DataFrame) -> None:
         if frame.empty:
