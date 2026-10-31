@@ -374,3 +374,56 @@ def test_repair_reports_bar_still_missing_from_provider(
     assert "missing 1 -> 1 bars" in output
     assert "provider_missing=1" in output
     assert cache.stores == 0
+
+
+def test_cache_write_failure_is_operational_not_provider_missing(
+    monkeypatch, tmp_path, capsys
+) -> None:
+    now = datetime(2026, 10, 31, 12, 0, tzinfo=ZoneInfo("America/New_York"))
+    config = tmp_path / "collector.json"
+    report = tmp_path / "gaps.json"
+    config.write_text(
+        json.dumps({"tickers": ["SPCX"], "interval": "1m", "cache_dir": str(tmp_path)})
+    )
+    report.write_text(
+        json.dumps(
+            {
+                "schema": 1,
+                "generated_at": now.isoformat(),
+                "days": 30,
+                "calendar": "NYSE",
+                "timezone": "America/New_York",
+                "interval": "1m",
+                "tickers": ["SPCX"],
+                "findings": [{"symbol": "SPCX", "day": "2026-10-30"}],
+            }
+        )
+    )
+
+    class FailingCache(MemoryCache):
+        def update_price_frame(self, key, updater):
+            raise RuntimeError("S3 write failed")
+
+    cache = FailingCache({})
+    monkeypatch.setattr(cache_gap_repair, "create_cache", lambda _: cache)
+    monkeypatch.setattr(
+        cache_gap_repair,
+        "fetch_yahoo_session",
+        lambda *_: pd.DataFrame(
+            {"Close": [100.0] * 390},
+            index=pd.date_range(
+                "2026-10-30 09:30", periods=390, freq="min", tz="America/New_York"
+            ),
+        ),
+    )
+
+    assert (
+        cache_gap_repair.main(
+            ["--config", str(config), "--report", str(report)], now=now
+        )
+        == 1
+    )
+    output = capsys.readouterr().out
+    assert "S3 write failed" in output
+    assert "operational_error=1" in output
+    assert "provider_missing=0" in output

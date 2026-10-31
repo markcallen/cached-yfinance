@@ -80,6 +80,7 @@ def main(argv: Sequence[str] | None = None, *, now: datetime | None = None) -> i
     unresolved = 0
     provider_unavailable = 0
     provider_missing = 0
+    operational_error = 0
     today = run_now.astimezone(ZoneInfo(report["timezone"])).date()
     # Yahoo requires the start of a 1m request to be within its rolling
     # 30-day window. The one-day request starts at midnight, so the day
@@ -109,7 +110,14 @@ def main(argv: Sequence[str] | None = None, *, now: datetime | None = None) -> i
                 f"{outcome.after_missing} bars"
                 + (f"; {outcome.error}" if outcome.error else "")
             )
-            if outcome.after_missing or outcome.error:
+            if outcome.error_kind in {
+                "provider_error",
+                "invalid_provider_data",
+                "cache_error",
+            }:
+                unresolved += 1
+                operational_error += 1
+            elif outcome.after_missing or outcome.error:
                 unresolved += 1
                 provider_missing += 1
             elif outcome.before_missing:
@@ -119,11 +127,13 @@ def main(argv: Sequence[str] | None = None, *, now: datetime | None = None) -> i
         except Exception as exc:
             print(f"{symbol} {day}: repair failed: {exc}", file=sys.stderr)
             unresolved += 1
+            operational_error += 1
     print(
         f"Gap repair summary: repaired={repaired} "
         f"already_complete={already_complete} unresolved={unresolved} "
         f"provider_unavailable={provider_unavailable} "
-        f"provider_missing={provider_missing} deferred={deferred}"
+        f"provider_missing={provider_missing} "
+        f"operational_error={operational_error} deferred={deferred}"
     )
     return 1 if unresolved or deferred else 0
 

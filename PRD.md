@@ -257,7 +257,9 @@ for symbol in ["SPY", "QQQ", "IWM"]:
   sessions attempted. For one-minute Yahoo requests, sessions outside the
   full-session retrieval window are left untouched and reported as provider
   unavailable. In-window sessions whose bars Yahoo omits remain visible as
-  provider missing. The audit itself remains read-only across 30 calendar days.
+  provider missing; fetch, data validation, and cache-write failures are
+  reported as operational errors. The audit itself remains read-only across
+  30 calendar days.
 - **Retrieval Compatibility:** Price data retains the established
   `symbol/interval/YYYY/MM/YYYY-MM-DD-interval.parquet` and JSON metadata key
   layout and remains readable through `S3Cache`.

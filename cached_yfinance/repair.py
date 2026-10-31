@@ -22,6 +22,7 @@ class RepairOutcome:
     before_missing: int
     after_missing: int
     error: str | None = None
+    error_kind: str | None = None
 
 
 def _valid_fetched_rows(
@@ -68,11 +69,21 @@ def repair_gap(
         return RepairOutcome(symbol, day, 0, 0)
 
     try:
-        fetched = _valid_fetched_rows(
-            fetch(symbol, day, interval), expected, interval, timezone
+        response = fetch(symbol, day, interval)
+    except Exception as exc:
+        return RepairOutcome(symbol, day, before, before, str(exc), "provider_error")
+    try:
+        fetched = _valid_fetched_rows(response, expected, interval, timezone)
+    except Exception as exc:
+        return RepairOutcome(
+            symbol, day, before, before, str(exc), "invalid_provider_data"
         )
-        if fetched.empty:
-            return RepairOutcome(symbol, day, before, before, "no valid bars returned")
+    if fetched.empty:
+        return RepairOutcome(
+            symbol, day, before, before, "no valid bars returned", "provider_missing"
+        )
+
+    try:
 
         def updater(current: pd.DataFrame | None) -> pd.DataFrame | None:
             if current is not None and not current.empty:
@@ -99,7 +110,7 @@ def repair_gap(
         after = len(missing_session_times(latest, expected, interval, timezone))
         return RepairOutcome(symbol, day, before, after)
     except Exception as exc:
-        return RepairOutcome(symbol, day, before, before, str(exc))
+        return RepairOutcome(symbol, day, before, before, str(exc), "cache_error")
 
 
 def fetch_yahoo_session(symbol: str, day: date, interval: str) -> pd.DataFrame:
