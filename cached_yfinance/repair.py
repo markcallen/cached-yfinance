@@ -82,8 +82,7 @@ def repair_gap(
                     before,
                     "downloaded columns differ from archive",
                 )
-            merged = pd.concat([existing, fetched])
-            merged = merged[~merged.index.duplicated(keep="last")].sort_index()
+            merged = existing.combine_first(fetched).sort_index()
         else:
             merged = fetched.sort_index()
         after = len(missing_session_times(merged, expected, interval, timezone))

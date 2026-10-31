@@ -61,6 +61,35 @@ def test_repair_keeps_archive_when_provider_has_no_improvement() -> None:
     pd.testing.assert_frame_equal(cache.load(key), partial)
 
 
+def test_repair_preserves_non_null_fields_on_overlapping_rows() -> None:
+    day = date(2026, 10, 30)
+    key = CacheKey("SPCX", "1m", day)
+    times = pd.DatetimeIndex(
+        ["2026-10-30 09:30", "2026-10-30 09:31"], tz="America/New_York"
+    )
+    existing = pd.DataFrame(
+        {"Open": [99.0], "Close": [100.0], "Volume": [10.0]}, index=times[:1]
+    )
+    fetched = pd.DataFrame(
+        {
+            "Open": [float("nan"), 100.0],
+            "Close": [101.0, 102.0],
+            "Volume": [float("nan"), 20.0],
+        },
+        index=times,
+    )
+    cache = MemoryCache({key: existing})
+
+    outcome = repair_gap(cache, "SPCX", day, "1m", lambda *_: fetched)
+
+    assert outcome.after_missing == outcome.before_missing - 1
+    repaired = cache.load(key)
+    assert repaired.loc[times[0], "Open"] == 99.0
+    assert repaired.loc[times[0], "Close"] == 100.0
+    assert repaired.loc[times[0], "Volume"] == 10.0
+    assert repaired.loc[times[1], "Close"] == 102.0
+
+
 def test_repair_reports_partial_progress_and_provider_error() -> None:
     day = date(2026, 10, 30)
     key = CacheKey("SPCX", "1m", day)

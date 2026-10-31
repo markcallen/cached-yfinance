@@ -462,6 +462,44 @@ class TestCachedYFClient:
         )
         assert not _looks_like_nyse_regular_hours(european_session, date(2026, 10, 30))
 
+    def test_recent_repair_includes_session_with_intraday_end_and_keeps_valid_fields(
+        self, cache: FileSystemCache
+    ) -> None:
+        client = CachedYFClient(cache)
+        day = date(2026, 10, 30)
+        key = CacheKey("SPCX", "1m", day)
+        times = pd.DatetimeIndex(
+            ["2026-10-30 09:30", "2026-10-30 15:59"],
+            tz="America/New_York",
+        )
+        partial = pd.DataFrame({"Open": [99.0], "Close": [100.0]}, index=times[:1])
+        fetched = pd.DataFrame(
+            {"Open": [float("nan"), 101.0], "Close": [float("nan"), 102.0]},
+            index=times,
+        )
+        cache.store(key, partial)
+        sessions = [(day, pd.Timestamp("2026-10-30 20:00:00Z"))]
+
+        with (
+            patch(
+                "cached_yfinance.client._recent_completed_nyse_sessions",
+                return_value=sessions,
+            ),
+            patch("yfinance.download", return_value=fetched) as upstream,
+        ):
+            client._repair_recent_incomplete_one_minute_sessions(
+                "SPCX",
+                {},
+                pd.Timestamp("2026-10-30 09:30", tz="America/New_York"),
+                pd.Timestamp("2026-10-30 16:00", tz="America/New_York"),
+            )
+
+        upstream.assert_called_once()
+        repaired = cache.load(key)
+        assert repaired.loc[times[0], "Open"] == 99.0
+        assert repaired.loc[times[0], "Close"] == 100.0
+        assert repaired.loc[times[1], "Close"] == 102.0
+
     @patch("cached_yfinance.client.pd.Timestamp.now")
     @patch("yfinance.download")
     def test_missing_current_intraday_day_uses_nonempty_fetch_window(

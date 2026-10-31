@@ -381,8 +381,17 @@ class CachedYFClient:
         for day, close in _recent_completed_nyse_sessions(now):
             if start is not None and day < start.date():
                 continue
-            if end is not None and day >= end.date():
-                continue
+            if end is not None:
+                end_local = (
+                    end.tz_localize("America/New_York")
+                    if end.tz is None
+                    else end.tz_convert("America/New_York")
+                )
+                session_open = pd.Timestamp(day, tz="America/New_York") + pd.Timedelta(
+                    hours=9, minutes=30
+                )
+                if end_local <= session_open:
+                    continue
             key = CacheKey(symbol=ticker, interval="1m", day=day)
             try:
                 existing = self.cache.load(key)
@@ -405,7 +414,7 @@ class CachedYFClient:
                         "Recent 1m history remains stale for %s on %s", ticker, day
                     )
                     continue
-                self.cache.store(key, _merge_dataframes([existing, fetched]))
+                self.cache.store(key, existing.combine_first(fetched).sort_index())
             except Exception as exc:
                 logger.warning(
                     "Could not repair recent 1m history for %s on %s: %s",
@@ -548,7 +557,7 @@ class CachedYFClient:
             if interval == "1m":
                 existing = self.cache.load(key)
                 if existing is not None and not existing.empty:
-                    day_frame = _merge_dataframes([existing, day_frame])
+                    day_frame = existing.combine_first(day_frame).sort_index()
             self.cache.store(key, day_frame)
 
     def get_options_expirations(
