@@ -13,7 +13,7 @@ from typing import Sequence
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from cached_yfinance.gaps import check_cache_gaps
-from tools.ticker_collector import create_cache
+from tools.ticker_collector import DEFAULT_CONFIG, create_cache
 
 
 def main(argv: Sequence[str] | None = None, *, now: datetime | None = None) -> int:
@@ -27,7 +27,7 @@ def main(argv: Sequence[str] | None = None, *, now: datetime | None = None) -> i
 
     try:
         with open(args.config, encoding="utf-8") as handle:
-            config = json.load(handle)
+            config = {**DEFAULT_CONFIG, **json.load(handle)}
         tickers = config["tickers"]
         if not isinstance(tickers, list) or not tickers:
             raise ValueError("tickers must be a nonempty list")

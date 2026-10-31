@@ -16,6 +16,7 @@ except ModuleNotFoundError:  # pragma: no cover - optional dependency
     mcal = None
 
 from .cache import CacheKey, FileSystemCache, OptionCacheKey
+from .repair import merge_price_frames
 
 
 TickerInput = Union[str, List[str]]
@@ -414,7 +415,7 @@ class CachedYFClient:
                         "Recent 1m history remains stale for %s on %s", ticker, day
                     )
                     continue
-                self.cache.store(key, existing.combine_first(fetched).sort_index())
+                self.cache.store(key, merge_price_frames(existing, fetched))
             except Exception as exc:
                 logger.warning(
                     "Could not repair recent 1m history for %s on %s: %s",
@@ -557,7 +558,7 @@ class CachedYFClient:
             if interval == "1m":
                 existing = self.cache.load(key)
                 if existing is not None and not existing.empty:
-                    day_frame = day_frame.combine_first(existing).sort_index()
+                    day_frame = merge_price_frames(day_frame, existing)
             self.cache.store(key, day_frame)
 
     def get_options_expirations(

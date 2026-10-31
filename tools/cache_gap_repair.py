@@ -13,7 +13,7 @@ from zoneinfo import ZoneInfo
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from cached_yfinance.repair import fetch_yahoo_session, repair_gap
-from tools.ticker_collector import create_cache
+from tools.ticker_collector import DEFAULT_CONFIG, create_cache
 
 
 def _validated_targets(
@@ -62,7 +62,7 @@ def main(argv: Sequence[str] | None = None, *, now: datetime | None = None) -> i
     args = parser.parse_args(argv)
     try:
         with open(args.config, encoding="utf-8") as handle:
-            config = json.load(handle)
+            config = {**DEFAULT_CONFIG, **json.load(handle)}
         with open(args.report, encoding="utf-8") as handle:
             report = json.load(handle)
         if args.max_sessions < 1:

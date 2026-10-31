@@ -90,6 +90,42 @@ def test_repair_preserves_non_null_fields_on_overlapping_rows() -> None:
     assert repaired.loc[times[1], "Close"] == 102.0
 
 
+def test_repair_accepts_reordered_compatible_columns() -> None:
+    day = date(2026, 10, 30)
+    key = CacheKey("SPCX", "1m", day)
+    times = pd.DatetimeIndex(
+        ["2026-10-30 09:30", "2026-10-30 09:31"], tz="America/New_York"
+    )
+    existing = pd.DataFrame({"Open": [99.0], "Close": [100.0]}, index=times[:1])
+    fetched = pd.DataFrame({"Close": [101.0], "Open": [100.0]}, index=times[1:])
+    cache = MemoryCache({key: existing})
+
+    outcome = repair_gap(cache, "SPCX", day, "1m", lambda *_: fetched)
+
+    assert outcome.after_missing == outcome.before_missing - 1
+    assert cache.stores == 1
+    assert list(cache.load(key).columns) == ["Open", "Close"]
+
+
+def test_repair_merges_utc_naive_and_aware_indexes() -> None:
+    day = date(2026, 10, 30)
+    key = CacheKey("SPCX", "1m", day)
+    existing = pd.DataFrame(
+        {"Close": [100.0]}, index=pd.DatetimeIndex(["2026-10-30 13:30"])
+    )
+    fetched = pd.DataFrame(
+        {"Close": [101.0]},
+        index=pd.DatetimeIndex(["2026-10-30 09:31"], tz="America/New_York"),
+    )
+    cache = MemoryCache({key: existing})
+
+    outcome = repair_gap(cache, "SPCX", day, "1m", lambda *_: fetched)
+
+    assert outcome.after_missing == outcome.before_missing - 1
+    assert len(cache.load(key)) == 2
+    assert str(cache.load(key).index.tz) == "UTC"
+
+
 def test_repair_reports_partial_progress_and_provider_error() -> None:
     day = date(2026, 10, 30)
     key = CacheKey("SPCX", "1m", day)
@@ -180,3 +216,38 @@ def test_repair_cli_rejects_stale_report(monkeypatch, tmp_path, capsys) -> None:
 
     assert status == 2
     assert "report is stale" in capsys.readouterr().err
+
+
+def test_commands_accept_collector_defaults(monkeypatch, tmp_path) -> None:
+    now = datetime(2026, 10, 31, 12, 0, tzinfo=ZoneInfo("America/New_York"))
+    config = tmp_path / "collector.json"
+    report = tmp_path / "gaps.json"
+    config.write_text(json.dumps({"tickers": ["SPCX"]}))
+    cache = MemoryCache({})
+    monkeypatch.setattr(cache_gap_check, "create_cache", lambda _: cache)
+    monkeypatch.setattr(cache_gap_repair, "create_cache", lambda _: cache)
+    monkeypatch.setattr(
+        cache_gap_repair,
+        "fetch_yahoo_session",
+        lambda *_: pd.DataFrame(
+            {"Close": [100.0] * 390},
+            index=pd.date_range(
+                "2026-10-30 09:30", periods=390, freq="min", tz="America/New_York"
+            ),
+        ),
+    )
+
+    assert (
+        cache_gap_check.main(
+            ["--config", str(config), "--days", "1", "--json-output", str(report)],
+            now=now,
+        )
+        == 1
+    )
+    assert (
+        cache_gap_repair.main(
+            ["--config", str(config), "--report", str(report)], now=now
+        )
+        == 0
+    )
+    assert cache.stores == 1

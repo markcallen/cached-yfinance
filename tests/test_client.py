@@ -393,6 +393,31 @@ class TestCachedYFClient:
         assert stored.loc[times[1], "Close"] == 102.0
         assert stored.loc[times[1], "Volume"] == 20.0
 
+    @pytest.mark.parametrize("cached_is_naive", [True, False])
+    def test_current_one_minute_refresh_merges_mixed_timezone_indexes(
+        self, cache: FileSystemCache, cached_is_naive: bool
+    ) -> None:
+        client = CachedYFClient(cache)
+        key = CacheKey("IWM", "1m", date(2026, 10, 30))
+        aware = pd.DatetimeIndex(["2026-10-30 13:30:00+00:00"])
+        naive = aware.tz_localize(None)
+        cache.store(
+            key,
+            pd.DataFrame({"Close": [100.0]}, index=naive if cached_is_naive else aware),
+        )
+        fresh = pd.DataFrame(
+            {"Close": [101.0]}, index=aware if cached_is_naive else naive
+        )
+
+        with patch("yfinance.download", return_value=fresh):
+            result = client.download("IWM", period="1d", interval="1m", progress=False)
+
+        pd.testing.assert_frame_equal(result, fresh)
+        stored = cache.load(key)
+        assert len(stored) == 1
+        assert str(stored.index.tz) == "UTC"
+        assert stored.iloc[0]["Close"] == 101.0
+
     def test_cached_date_range_repairs_incomplete_session(
         self, cache: FileSystemCache
     ) -> None:
