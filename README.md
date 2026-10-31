@@ -88,7 +88,10 @@ To repair gaps from a fresh report, run the check with
 The repair command tries the newest affected sessions first, up to 200 per run.
 It merges valid downloaded bars into the archive only when that reduces the
 gap count, and exits nonzero if any gaps remain. Yahoo may not serve older
-intraday bars, so those sessions remain reported for manual recovery.
+intraday bars. One-minute sessions beyond Yahoo's safe full-session window are
+reported as provider unavailable without a futile download. Missing bars that
+Yahoo still omits are reported separately. Both remain in the 30-day audit for
+manual recovery; no prices are synthesized.
 
 ## 📦 Installation
 

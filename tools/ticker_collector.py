@@ -147,6 +147,20 @@ def current_nyse_session(
     return local_now.date(), cutoff
 
 
+def completed_session_last_bar(now: datetime, timezone: str) -> Optional[datetime]:
+    """Require the final one-minute bar once a session closed 30 minutes ago."""
+    local_now = now.astimezone(ZoneInfo(timezone))
+    schedule = mcal.get_calendar("NYSE").schedule(
+        start_date=local_now.date(), end_date=local_now.date()
+    )
+    if schedule.empty:
+        return None
+    market_close = schedule.iloc[0]["market_close"].tz_convert(timezone)
+    if local_now < market_close.to_pydatetime() + timedelta(minutes=30):
+        return None
+    return (market_close - pd.Timedelta(minutes=1)).to_pydatetime()
+
+
 def collect_1m_data(
     ticker: str,
     client: cyf.CachedYFClient,
@@ -155,6 +169,7 @@ def collect_1m_data(
     logger: logging.Logger,
     session_date: Optional[date] = None,
     freshness_cutoff: Optional[datetime] = None,
+    required_last_bar: Optional[datetime] = None,
     timezone: str = "America/New_York",
 ) -> Dict:
     """
@@ -243,6 +258,14 @@ def collect_1m_data(
                     f"is before {freshness_cutoff}"
                 )
                 return stats
+            if required_last_bar is not None:
+                closes = data.loc[current_rows, "Close"]
+                valid = closes.notna()
+                if isinstance(valid, pd.DataFrame):
+                    valid = valid.any(axis=1)
+                if not ((local_index == required_last_bar) & valid.to_numpy()).any():
+                    stats["error"] = f"Missing final session bar at {required_last_bar}"
+                    return stats
             data = data.loc[current_rows]
             display_index = local_index
         else:
@@ -349,13 +372,16 @@ Cron example (daily at 5:00 PM EST after market close):
     interval = config.get("interval", "1m")
     session_date = None
     freshness_cutoff = None
+    required_last_bar = None
     if interval == "1m":
         timezone = config.get("timezone", "America/New_York")
-        session = current_nyse_session(datetime.now(ZoneInfo(timezone)), timezone)
+        run_now = datetime.now(ZoneInfo(timezone))
+        session = current_nyse_session(run_now, timezone)
         if session is None:
             logger.info("No NYSE trading session today; skipping collection")
             return 0
         session_date, freshness_cutoff = session
+        required_last_bar = completed_session_last_bar(run_now, timezone)
 
     # Initialize client
     try:
@@ -381,6 +407,7 @@ Cron example (daily at 5:00 PM EST after market close):
             logger,
             session_date=session_date,
             freshness_cutoff=freshness_cutoff,
+            required_last_bar=required_last_bar,
             timezone=config.get("timezone", "America/New_York"),
         )
 

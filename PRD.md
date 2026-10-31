@@ -235,7 +235,10 @@ for symbol in ["SPY", "QQQ", "IWM"]:
   collector run has current-session bars for every configured ticker, with the
   newest bar no more than 30 minutes behind the earlier of the run time and
   that session's market close. Missing or stale data makes the process exit
-  nonzero; a non-trading day is logged as a skip.
+  nonzero; a non-trading day is logged as a skip. Starting 30 minutes after the
+  session closes, a successful one-minute collector run additionally requires
+  a non-null final regular-session bar. This completed-session check does not
+  change the 30-minute live freshness tolerance.
 - **Recent One-Minute Cache Repair:** A one-minute download also checks cached
   NYSE sessions from the previous six calendar days. If a completed session's
   last bar is over 30 minutes before its market close, the client refetches
@@ -251,7 +254,10 @@ for symbol in ["SPY", "QQQ", "IWM"]:
   refetches affected ticker-sessions, newest first. It keeps existing bars and
   writes an archive only when valid fetched data reduces missing bars. It
   reports unresolved gaps and exits nonzero; a run can cap the number of
-  sessions attempted. The audit itself remains read-only.
+  sessions attempted. For one-minute Yahoo requests, sessions outside the
+  full-session retrieval window are left untouched and reported as provider
+  unavailable. In-window sessions whose bars Yahoo omits remain visible as
+  provider missing. The audit itself remains read-only across 30 calendar days.
 - **Retrieval Compatibility:** Price data retains the established
   `symbol/interval/YYYY/MM/YYYY-MM-DD-interval.parquet` and JSON metadata key
   layout and remains readable through `S3Cache`.
