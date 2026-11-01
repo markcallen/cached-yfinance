@@ -93,6 +93,19 @@ reported as provider unavailable without a futile download. Missing bars that
 Yahoo still omits are reported separately from operational errors. All remain
 in the 30-day audit for manual recovery; no prices are synthesized.
 
+Yahoo sometimes has no usable one-minute bar even for a valid trading minute:
+its chart response can contain a timestamp with null price fields. It also
+rejects one-minute requests beyond its rolling history limit. The repair cannot
+fill either kind of gap from Yahoo. It preserves the existing archive, continues
+with other sessions, and exits with status 1 if any gaps remain. A Kubernetes
+repair Job therefore shows `Failed` even when it successfully filled other
+sessions. Check the final `provider_missing`, `provider_unavailable`, and
+`operational_error` counts in the Job log to distinguish unavailable Yahoo data
+from a fetch or cache error. Retry in-window gaps if Yahoo later supplies the
+bar; use a verified independent source for bars Yahoo cannot supply. A later
+clean audit can also mean a gap aged out of the 30-day check; it does not mean
+the older archive was repaired.
+
 ## 📦 Installation
 
 ### From PyPI (recommended)
