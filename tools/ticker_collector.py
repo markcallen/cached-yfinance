@@ -266,11 +266,11 @@ def collect_1m_data(
                     valid = valid.any(axis=1)
                 valid_index = local_index[valid.to_numpy()]
                 if not (valid_index == required_last_bar).any():
-                    # Yahoo can omit an individual closing minute. A nearly
-                    # complete archive is usable; the gap audit will report
-                    # the missing bar. Older tails still fail this Job.
+                    # Yahoo can omit the closing portion of a session. Allow
+                    # a bounded provider gap; the gap audit reports missing
+                    # bars. Older or out-of-session tails still fail this Job.
                     recent_session_bars = valid_index[
-                        (valid_index >= required_last_bar - timedelta(minutes=5))
+                        (valid_index >= required_last_bar - timedelta(minutes=15))
                         & (valid_index <= required_last_bar)
                     ]
                     if recent_session_bars.empty:
@@ -281,10 +281,11 @@ def collect_1m_data(
                         return stats
                     stats["missing_final_bar"] = True
                     logger.warning(
-                        "%s: Provider omitted final session bar at %s; "
-                        "gap audit will track it",
+                        "%s: Provider omitted final session bar at %s; newest "
+                        "valid regular-session bar is %s; gap audit will track it",
                         ticker,
                         required_last_bar,
+                        recent_session_bars.max(),
                     )
             data = data.loc[current_rows]
             display_index = local_index
