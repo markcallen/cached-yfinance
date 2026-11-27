@@ -40,3 +40,14 @@ def test_configured_collection_window_is_intersected_with_exchange_session() -> 
     assert is_market_open(restricted, at("2026-11-30", 10))
     assert not is_market_open(restricted, at("2026-11-30", 15))
     assert not is_market_open(restricted, at("2026-11-27", 14))
+
+
+def test_session_lookup_uses_new_york_date_for_other_configured_timezone() -> None:
+    tokyo = ZoneInfo("Asia/Tokyo")
+    config = {
+        "timezone": "Asia/Tokyo",
+        "market_open": "00:00",
+        "market_close": "23:59",
+    }
+    assert is_market_open(config, datetime(2026, 12, 1, 5, 0, tzinfo=tokyo))
+    assert is_scheduled_close(config, datetime(2026, 12, 1, 6, 2, tzinfo=tokyo))

@@ -269,10 +269,11 @@ def collect_1m_data(
                     # Yahoo can omit an individual closing minute. A nearly
                     # complete archive is usable; the gap audit will report
                     # the missing bar. Older tails still fail this Job.
-                    if (
-                        valid_index.empty
-                        or valid_index.max() < required_last_bar - timedelta(minutes=5)
-                    ):
+                    recent_session_bars = valid_index[
+                        (valid_index >= required_last_bar - timedelta(minutes=5))
+                        & (valid_index <= required_last_bar)
+                    ]
+                    if recent_session_bars.empty:
                         stats["error"] = (
                             f"Session tail is incomplete: final bar {required_last_bar}, "
                             f"newest valid bar {valid_index.max() if not valid_index.empty else 'none'}"

@@ -94,9 +94,9 @@ def nyse_session_window(
     now: datetime, timezone: str
 ) -> Optional[tuple[datetime, datetime]]:
     """Return today's exchange open and close, including holidays and short days."""
-    local_now = now.astimezone(ZoneInfo(timezone))
+    exchange_now = now.astimezone(ZoneInfo("America/New_York"))
     schedule = mcal.get_calendar("NYSE").schedule(
-        start_date=local_now.date(), end_date=local_now.date()
+        start_date=exchange_now.date(), end_date=exchange_now.date()
     )
     if schedule.empty:
         return None

@@ -266,6 +266,25 @@ def test_early_close_accepts_near_complete_provider_tail_without_final_minute() 
     assert near_complete["missing_final_bar"] is True
     assert stale["success"] is False
 
+    class AfterHoursClient:
+        def download(self, ticker: str, **kwargs: object) -> pd.DataFrame:
+            return pd.DataFrame(
+                {"Close": [100.0, 101.0]},
+                index=pd.DatetimeIndex(
+                    ["2026-11-27 12:45", "2026-11-27 13:05"], tz=eastern
+                ),
+            )
+
+    after_hours = ticker_collector.collect_1m_data(
+        "IWM",
+        AfterHoursClient(),
+        1,
+        "1m",
+        ticker_collector.setup_logging(),
+        **kwargs,
+    )
+    assert after_hours["success"] is False
+
 
 def test_price_collector_main_fails_when_all_tickers_return_no_data(
     monkeypatch,
