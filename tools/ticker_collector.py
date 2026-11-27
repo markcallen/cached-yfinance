@@ -191,6 +191,7 @@ def collect_1m_data(
         "data_points": 0,
         "date_range": None,
         "error": None,
+        "missing_final_bar": False,
     }
 
     try:
@@ -263,9 +264,28 @@ def collect_1m_data(
                 valid = closes.notna()
                 if isinstance(valid, pd.DataFrame):
                     valid = valid.any(axis=1)
-                if not ((local_index == required_last_bar) & valid.to_numpy()).any():
-                    stats["error"] = f"Missing final session bar at {required_last_bar}"
-                    return stats
+                valid_index = local_index[valid.to_numpy()]
+                if not (valid_index == required_last_bar).any():
+                    # Yahoo can omit an individual closing minute. A nearly
+                    # complete archive is usable; the gap audit will report
+                    # the missing bar. Older tails still fail this Job.
+                    recent_session_bars = valid_index[
+                        (valid_index >= required_last_bar - timedelta(minutes=5))
+                        & (valid_index <= required_last_bar)
+                    ]
+                    if recent_session_bars.empty:
+                        stats["error"] = (
+                            f"Session tail is incomplete: final bar {required_last_bar}, "
+                            f"newest valid bar {valid_index.max() if not valid_index.empty else 'none'}"
+                        )
+                        return stats
+                    stats["missing_final_bar"] = True
+                    logger.warning(
+                        "%s: Provider omitted final session bar at %s; "
+                        "gap audit will track it",
+                        ticker,
+                        required_last_bar,
+                    )
             data = data.loc[current_rows]
             display_index = local_index
         else:

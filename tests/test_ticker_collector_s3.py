@@ -227,6 +227,65 @@ def test_after_close_uses_early_close_and_waits_thirty_minutes() -> None:
     ) == datetime(2026, 11, 27, 12, 59, tzinfo=eastern)
 
 
+def test_early_close_accepts_near_complete_provider_tail_without_final_minute() -> None:
+    eastern = ZoneInfo("America/New_York")
+
+    class StubClient:
+        def __init__(self, last_bar: str) -> None:
+            self.last_bar = last_bar
+
+        def download(self, ticker: str, **kwargs: object) -> pd.DataFrame:
+            return pd.DataFrame(
+                {"Close": [100.0]},
+                index=pd.DatetimeIndex([self.last_bar], tz=eastern),
+            )
+
+    kwargs = {
+        "session_date": date(2026, 11, 27),
+        "freshness_cutoff": datetime(2026, 11, 27, 12, 30, tzinfo=eastern),
+        "required_last_bar": datetime(2026, 11, 27, 12, 59, tzinfo=eastern),
+        "timezone": "America/New_York",
+    }
+    near_complete = ticker_collector.collect_1m_data(
+        "IWM",
+        StubClient("2026-11-27 12:58"),
+        1,
+        "1m",
+        ticker_collector.setup_logging(),
+        **kwargs,
+    )
+    stale = ticker_collector.collect_1m_data(
+        "IWM",
+        StubClient("2026-11-27 12:50"),
+        1,
+        "1m",
+        ticker_collector.setup_logging(),
+        **kwargs,
+    )
+    assert near_complete["success"] is True
+    assert near_complete["missing_final_bar"] is True
+    assert stale["success"] is False
+
+    class AfterHoursClient:
+        def download(self, ticker: str, **kwargs: object) -> pd.DataFrame:
+            return pd.DataFrame(
+                {"Close": [100.0, 101.0]},
+                index=pd.DatetimeIndex(
+                    ["2026-11-27 12:45", "2026-11-27 13:05"], tz=eastern
+                ),
+            )
+
+    after_hours = ticker_collector.collect_1m_data(
+        "IWM",
+        AfterHoursClient(),
+        1,
+        "1m",
+        ticker_collector.setup_logging(),
+        **kwargs,
+    )
+    assert after_hours["success"] is False
+
+
 def test_price_collector_main_fails_when_all_tickers_return_no_data(
     monkeypatch,
 ) -> None:
