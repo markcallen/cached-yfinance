@@ -32,12 +32,13 @@ import argparse
 import json
 import logging
 import sys
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, Optional
+from zoneinfo import ZoneInfo
 
 import pandas as pd
-import pytz
+import pandas_market_calendars as mcal
 
 
 # Add the parent directory to the path so we can import cached_yfinance
@@ -89,38 +90,38 @@ def setup_logging(log_file: Optional[str] = None) -> logging.Logger:
     return logger
 
 
-def is_market_open(config: Dict) -> bool:
-    """
-    Check if the market is currently open based on configuration.
+def nyse_session_window(
+    now: datetime, timezone: str
+) -> Optional[tuple[datetime, datetime]]:
+    """Return today's exchange open and close, including holidays and short days."""
+    local_now = now.astimezone(ZoneInfo(timezone))
+    schedule = mcal.get_calendar("NYSE").schedule(
+        start_date=local_now.date(), end_date=local_now.date()
+    )
+    if schedule.empty:
+        return None
+    row = schedule.iloc[0]
+    return (
+        row["market_open"].tz_convert(timezone).to_pydatetime(),
+        row["market_close"].tz_convert(timezone).to_pydatetime(),
+    )
 
-    Args:
-        config: Configuration dictionary with timezone and market hours
 
-    Returns:
-        True if market is open, False otherwise
-    """
-    try:
-        # Get timezone
-        tz = pytz.timezone(config["timezone"])
-        now = datetime.now(tz)
+def is_market_open(config: Dict, now: Optional[datetime] = None) -> bool:
+    timezone = config["timezone"]
+    run_now = now or datetime.now(ZoneInfo(timezone))
+    session = nyse_session_window(run_now, timezone)
+    return session is not None and session[0] <= run_now < session[1]
 
-        # Check if it's a weekday (Monday=0, Sunday=6)
-        if now.weekday() >= 5:  # Saturday or Sunday
-            return False
 
-        # Parse market hours
-        market_open = datetime.strptime(config["market_open"], "%H:%M").time()
-        market_close = datetime.strptime(config["market_close"], "%H:%M").time()
-
-        current_time = now.time()
-
-        # Check if current time is within market hours
-        return market_open <= current_time <= market_close
-
-    except Exception as e:
-        # If we can't determine market hours, assume closed for safety
-        logging.error(f"Error checking market hours: {e}")
-        return False
+def is_scheduled_close(config: Dict, now: Optional[datetime] = None) -> bool:
+    """Only collect on the actual exchange close, allowing a short startup delay."""
+    timezone = config["timezone"]
+    run_now = now or datetime.now(ZoneInfo(timezone))
+    session = nyse_session_window(run_now, timezone)
+    return session is not None and session[1] <= run_now < session[1] + timedelta(
+        minutes=15
+    )
 
 
 def load_config(config_file: Optional[str] = None) -> Dict:
@@ -283,6 +284,12 @@ Cron example (every 15 minutes during market hours):
     )
 
     parser.add_argument(
+        "--scheduled-close",
+        action="store_true",
+        help="Collect only within 15 minutes after today's NYSE close",
+    )
+
+    parser.add_argument(
         "--version",
         action="version",
         version=f"%(prog)s 1.0.0 (cached-yfinance {cyf.__version__})",
@@ -307,8 +314,13 @@ Cron example (every 15 minutes during market hours):
     logger.info(f"Cache directory: {config['cache_dir'] or '~/.cache/yfinance'}")
     logger.info(f"Max expirations per ticker: {config['max_expirations']}")
 
-    # Check if market is open (unless forced)
-    if not args.force and not is_market_open(config):
+    # The dedicated close Jobs bypass the normal hours check only at the
+    # exchange's actual close. Manual --force retains its existing behavior.
+    if args.scheduled_close:
+        if not is_scheduled_close(config):
+            logger.info("Not within today's NYSE closing window. Exiting.")
+            return
+    elif not args.force and not is_market_open(config):
         logger.info("Market is closed. Exiting.")
         return
 
