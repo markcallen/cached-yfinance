@@ -254,9 +254,17 @@ def test_early_close_accepts_near_complete_provider_tail_without_final_minute() 
         ticker_collector.setup_logging(),
         **kwargs,
     )
+    provider_tail = ticker_collector.collect_1m_data(
+        "IWM",
+        StubClient("2026-11-27 12:45"),
+        1,
+        "1m",
+        ticker_collector.setup_logging(),
+        **kwargs,
+    )
     stale = ticker_collector.collect_1m_data(
         "IWM",
-        StubClient("2026-11-27 12:50"),
+        StubClient("2026-11-27 12:40"),
         1,
         "1m",
         ticker_collector.setup_logging(),
@@ -264,6 +272,8 @@ def test_early_close_accepts_near_complete_provider_tail_without_final_minute() 
     )
     assert near_complete["success"] is True
     assert near_complete["missing_final_bar"] is True
+    assert provider_tail["success"] is True
+    assert provider_tail["missing_final_bar"] is True
     assert stale["success"] is False
 
     class AfterHoursClient:
@@ -271,7 +281,7 @@ def test_early_close_accepts_near_complete_provider_tail_without_final_minute() 
             return pd.DataFrame(
                 {"Close": [100.0, 101.0]},
                 index=pd.DatetimeIndex(
-                    ["2026-11-27 12:45", "2026-11-27 13:05"], tz=eastern
+                    ["2026-11-27 12:40", "2026-11-27 13:05"], tz=eastern
                 ),
             )
 
