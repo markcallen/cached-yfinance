@@ -111,7 +111,14 @@ def is_market_open(config: Dict, now: Optional[datetime] = None) -> bool:
     timezone = config["timezone"]
     run_now = now or datetime.now(ZoneInfo(timezone))
     session = nyse_session_window(run_now, timezone)
-    return session is not None and session[0] <= run_now < session[1]
+    local_time = run_now.astimezone(ZoneInfo(timezone)).time()
+    configured_open = datetime.strptime(config["market_open"], "%H:%M").time()
+    configured_close = datetime.strptime(config["market_close"], "%H:%M").time()
+    return (
+        session is not None
+        and session[0] <= run_now < session[1]
+        and configured_open <= local_time < configured_close
+    )
 
 
 def is_scheduled_close(config: Dict, now: Optional[datetime] = None) -> bool:
